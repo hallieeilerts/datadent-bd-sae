@@ -40,7 +40,7 @@ EAOut <- EAOut[,c("DHSCLUST","Mapped_district")]
 temp <- data.frame(  DHSCLUSTER = as.numeric(as.character(EAOut$DHSCLUST)),
                      district = as.character(EAOut$Mapped_district))
 
-write.csv(temp, "./gen/BDGE81FL_C.csv", row.names = FALSE)
+#write.csv(temp, "./gen/BDGE81FL_C.csv", row.names = FALSE)
 write.csv(temp, "./gen/cluster-districts.csv", row.names = FALSE)
 
 

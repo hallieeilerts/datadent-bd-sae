@@ -13,7 +13,7 @@ library(RColorBrewer)
 source("./src/util.R")
 # Bangladesh district boundaries
 AD2 <- readOGR(dsn="./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
-# Location masked of DHS clusters
+# vas indicator
 vas <- read.csv("./gen/ch_vas_data.csv")
 ################################################################################
 

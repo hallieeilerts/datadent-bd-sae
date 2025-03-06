@@ -8,6 +8,7 @@ rm(list = ls())
 #' Libraries
 library(haven)
 library(tidyverse)
+library(survey)
 #' Inputs
 source("./src/util.R")
 ## DHS child recode
@@ -25,7 +26,7 @@ covariate_metadata <- configure_covariate(
 
 dat_prep <- fn_prepKR(dat)
 
-# merge on districts to clusters
+# merge on shape file district names to clusters
 nrow(dat_prep) # 8784
 dat_prep <- merge(dat_prep, clusters, by.x = "v001", by.y = "DHSCLUSTER")
 nrow(dat_prep) # 8784
@@ -34,17 +35,10 @@ nrow(dat_prep) # 8784
 dat_var <- fn_gen_nt_ch_micro_vas(dat_prep)
 
 # calculate weighted proportions for categorical variable
-prop_adm0 <- fn_wtd_prop(dat_var, adminlevel = "adm0")
-prop_adm1 <- fn_wtd_prop(dat_var, adminlevel = "adm1")
-prop_adm2 <- fn_wtd_prop(dat_var, adminlevel = "adm2")
-dat_prop <- rbind(prop_adm0, prop_adm1, prop_adm2)
-
-# Subset group that received intervention
-dat_ind <- subset(dat_prop, var == "Yes")
-dat_ind$var <- NULL
+dat_prop <- fn_var_taylor(dat_var)
 
 # Format
-dat_formatted <- fn_format(dat_ind, covariate_metadata)
+dat_formatted <- fn_format_var(dat_prop, covariate_metadata)
 
 # Save --------------------------------------------------------------------
 

@@ -21,8 +21,8 @@ configure_covariate <- function(name, label, scale, dhs_indicator_code){
 }
 
 write_output_data <- function(df, covariate_metadata) {
-  filename_data <- str_glue("./gen/indicators/temp/{covariate_metadata$name}_data.csv")
-  filename_meta <- str_glue("./gen/indicators/temp/{covariate_metadata$name}_metadata.json")
+  filename_data <- str_glue("./gen/indicators/output/{covariate_metadata$name}_data.csv")
+  filename_meta <- str_glue("./gen/indicators/output/{covariate_metadata$name}_metadata.json")
   
   # Write data file (csv)
   write.csv(df, filename_data, row.names=FALSE)
@@ -34,6 +34,85 @@ write_output_data <- function(df, covariate_metadata) {
     sep = "\n",
     append = FALSE
   )
+}
+
+# deletes and recreates the data sub-folder
+int_data_subfolder <- function(subfolder_name) {
+  # ⚠ - Delete the entire data sub-directory to make sure we don't have old data
+  if (unlink(str_glue("./data/{subfolder_name}"), recursive = TRUE) == 1) {
+    stop(str_glue("Failed to delete data. Make sure you don't have any files open from that directory."))
+  }
+  
+  # Create data fodler
+  dir.create(str_glue("./data/{subfolder_name}"))
+}
+
+# deletes file
+delete_file <- function(path) {
+  if (unlink(path, recursive = TRUE) == 1) {
+    stop(str_glue("Failed to delete {filename_data}. Please close any applications that might be using the file."))
+  }
+}
+
+# Returns current time in iso86001 format
+current_time_iso86001 <- function() {        
+  time <- as.POSIXlt(Sys.time(), "UTC")
+  strftime(time, "%Y-%m-%dT%H:%M:%S%z")
+}
+
+# Fetches data from a DHS indicator
+read_dhs <- function(dhs_indicator_code) {
+  api_url <-
+    str_glue(
+      "https://api.dhsprogram.com/rest/dhs/data/{dhs_indicator_code}?perpage=1000000"
+    )
+  json_file <- jsonlite::fromJSON(api_url)
+  
+  # Verify that we got the entire dataset
+  if (json_file$RecordsReturned != json_file$RecordCount) {
+    stop("Did not get all records, implement pagination")
+  }
+  
+  # Unlist the JSON file entries
+  json_data <- lapply(json_file$Data, function(x) {
+    unlist(x)
+  })
+  
+  # Convert JSON input to a data frame
+  result <-
+    as_tibble(t(as.data.frame(
+      do.call("rbind", json_data), stringsAsFactors = FALSE
+    )))
+  
+  dir.create("./data/dhs", showWarnings = FALSE)
+  filename_data <- str_glue("./data/dhs-statcompiler/{dhs_indicator_code}.csv")
+  filename_meta <- str_glue("./data/dhs-statcompiler/{dhs_indicator_code}.json")
+  
+  # Delete previous files
+  delete_file(filename_data)
+  delete_file(filename_meta)
+  
+  # Indicator description
+  indicator_description <- unique(result$Indicator)
+  
+  # Write input file
+  write.csv(result, filename_data, row.names=FALSE)
+  # Write json
+  cat(
+    '{',
+    str_glue(' "label": "GHO ({dhs_indicator_code})",'),
+    str_glue(' "source_name": "DHS",'),
+    str_glue(' "source_indicator_code": "{dhs_indicator_code}",'),
+    str_glue(' "source_indicator_description": "{indicator_description}",'),
+    str_glue(' "source_url": "{api_url}",'),
+    str_glue(' "time_downloaded": "{current_time_iso86001()}"'),
+    '}',
+    file = filename_meta,
+    sep = "\n",
+    append = FALSE
+  )
+  
+  result
 }
 
 
@@ -96,37 +175,126 @@ fn_nt_ch_micro_dwm	<- function(x){
 
 
 # Function to calculate weighted proportions for categorical variables
-fn_wtd_prop <- function(x, covariate_metadata, adminlevel = "adm0"){
+fn_wtd_prop <- function(x) {
   
-  if(adminlevel == "adm0"){
-    x <- x %>% 
-      mutate(admin_level = adminlevel,
-             region_name = NA,
-             district_name = NA) 
-  }
-  if(adminlevel == "adm1"){
-    x <- x %>% 
-      mutate(admin_level = adminlevel,
-             district_name = NA) 
-  }
-  if(adminlevel == "adm2"){
-    x <- x %>% 
-      mutate(admin_level = adminlevel,
-             district_name = district) 
+  # Create a list to store results for all admin levels
+  results_list <- list()
+  
+  # Loop through all admin levels
+  for (adminlevel in c("adm0", "adm1", "adm2")) {
+    
+    # Add appropriate admin level columns
+    x_modified <- x %>% mutate(admin_level = adminlevel)
+    
+    if (adminlevel == "adm0") {
+      x_modified <- x_modified %>%
+        mutate(region_name = NA,
+               district_name = NA)
+    }
+    
+    if (adminlevel == "adm1") {
+      x_modified <- x_modified %>%
+        mutate(district_name = NA)
+    }
+    
+    if (adminlevel == "adm2") {
+      x_modified <- x_modified %>%
+        mutate(district_name = district)
+    }
+    
+    # Compute weighted proportion
+    suppressMessages({
+      result <- x_modified %>%
+        group_by(admin_level, region_name, district_name, var) %>%
+        dplyr::summarise(n = sum(wt), .groups = "drop") %>%
+        group_by(admin_level, region_name, district_name) %>%
+        mutate(per = n / sum(n)) %>%
+        filter(!is.na(per)) %>%  # Handle cases where wt is always zero
+        filter(var == "Yes") %>%
+        select(-var)
+    })
+    
+    # Store results in list
+    results_list[[adminlevel]] <- result
   }
   
-  # Calculate weighted proportion for each category of variable
-  suppressMessages(
-    result <- x %>%
-      group_by(admin_level, region_name, district_name, var) %>%
-      dplyr::summarise(n = sum(wt)) %>%
-      mutate(per = n /sum(n)) %>%
-      filter(!is.na(per)) %>% # In some regions, wt is always zero (PK2017DHS). Then per will be NA.
-      select(-c(n))
-  )
+  # Combine results for all levels into one dataframe
+  final_result <- bind_rows(results_list)
   
-  return(result)
+  return(final_result)
 }
+
+fn_var_taylor <- function(x, admin_levels = c("adm0", "adm1", "adm2")){
+
+  # List to store variance results for each admin level
+  results_list <- list()
+
+  for (adminlevel in admin_levels) {
+    
+    # Modify data according to admin level
+    x_modified <- x %>% mutate(admin_level = adminlevel)
+    
+    if (adminlevel == "adm0") {
+      x_modified <- x_modified %>%
+        mutate(region_name = "none",
+               district_name = "none")
+    }
+    
+    if (adminlevel == "adm1") {
+      x_modified <- x_modified %>%
+        mutate(district_name = "none")
+    }
+    
+    if (adminlevel == "adm2") {
+      x_modified <- x_modified %>%
+        mutate(district_name = district)
+    }
+    
+    # Convert categorical variable to numeric
+    x_modified <- x_modified %>%
+      mutate(var_numeric = ifelse(var=="Yes", 1, 0))
+    
+    # Define survey design using Taylor Linearization
+    survey_design <- svydesign(
+      id = ~v021,       # Primary Sampling Unit (PSU)
+      strata = ~v022,   # Stratification variable
+      weights = ~wt,    # Survey weights
+      data = x_modified,
+      nest = TRUE       # Accounts for stratification
+    )
+    
+    # Define survey design
+    survey_design <- svydesign(
+      id = ~v021,       # Primary Sampling Unit (PSU)
+      strata = ~v022,   # Stratification variable
+      weights = ~wt,    # Survey weights
+      data = x_modified,
+      nest = TRUE       # Accounts for stratification
+    )
+    
+    # Taylor series linearization
+    # Compute the weighted proportion and variance using svymean
+    taylor_results <- svyby(
+      formula = ~var_numeric,  # variable of interest
+      by = ~admin_level + region_name + district_name,  # grouping
+      design = survey_design,
+      FUN = svymean,               # Compute mean (proportion)
+      vartype = "se"               # Get standard error (SE)
+    ) %>%
+      mutate(variance = as.numeric(se)^2) %>%
+      rename(value = var_numeric)
+    
+    # Store results
+    results_list[[adminlevel]] <- taylor_results
+  }
+
+  # Combine results into a single dataframe
+  final_variance_results <- bind_rows(results_list)
+
+  return(final_variance_results)
+
+}
+
 
 fn_format <- function(x, covariate_metadata){
   
@@ -145,6 +313,41 @@ fn_format <- function(x, covariate_metadata){
   x <- x %>% relocate(any_of(c("dhs_indicator_code","admin_level", 
                                "region_name", "district_name",
                                 "value")), .after = indicator)
+  
+  x <- x[order(x$admin_level, x$region_name, x$district_name),]
+  
+  return(x)
+  
+}
+
+fn_format_var <- function(x, covariate_metadata){
+  
+  x$strata <- row.names(x)
+  row.names(x) <- NULL
+  x$indicator <- covariate_metadata$name
+  
+  x$dhs_indicator_code <- NA
+  if(length(covariate_metadata$sex_categories) > 1){
+    x$dhs_indicator_code[x$sex == "M"] <- covariate_metadata$dhs_indicator_code[1]
+    x$dhs_indicator_code[x$sex == "F"] <- covariate_metadata$dhs_indicator_code[2]
+    x$dhs_indicator_code[x$sex == "MF"] <- covariate_metadata$dhs_indicator_code[3]
+  }else{
+    x$dhs_indicator_code <- covariate_metadata$dhs_indicator_code[1]
+  }
+  
+  x <- x %>% relocate(any_of(c("dhs_indicator_code", "strata",
+                               "admin_level", 
+                               "region_name", "district_name",
+                               "value", "se", "variance")), .after = indicator)
+  
+
+  x$district_name[x$district_name == "none"] <- NA
+  
+  # format region name to match shape files
+  x$region_name <- paste(toupper(substr(x$region_name, 1, 1)), substr(x$region_name, 2, nchar(x$region_name)), sep="")
+  x$region_name[x$region_name == "None"] <- NA
+  x$region_name[x$region_name == "Barishal"] <- "Barisal"
+  x$region_name[x$region_name == "Chattogram"] <- "Chittagong"
   
   x <- x[order(x$admin_level, x$region_name, x$district_name),]
   
