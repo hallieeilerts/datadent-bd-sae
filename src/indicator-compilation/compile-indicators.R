@@ -10,13 +10,10 @@ library(tidyverse)
 library(survey)
 #' Inputs
 source("./src/util.R")
-
 ################################################################################
 
 all_indicators <- list.files(path = "./src/indicators", pattern = "*.R") %>%
   map(tools::file_path_sans_ext)
-
-all_indicators <- all_indicators[-1]
 
 all_data = NULL
 for(indicator_name in all_indicators) {
