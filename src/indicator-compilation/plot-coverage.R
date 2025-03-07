@@ -12,7 +12,7 @@ library(viridis)
 #' Inputs
 source("./src/util.R")
 # Bangladesh district boundaries
-AD1 <- readOGR(dsn="./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm1_bbs_20201113")
+AD1 <- readOGR(dsn="./gen/prepare-shp/output/modified_bgd_adm1", layer = "bgd_admbnda_adm1_bbs_20201113_modified")
 AD2 <- readOGR(dsn="./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
 # Manually calculated indicators
 dat_filename <- list.files("./gen/indicator-compilation/output")
