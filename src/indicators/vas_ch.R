@@ -14,7 +14,7 @@ source("./src/util.R")
 ## DHS child recode
 dat <- read_dta("./data/BD_2022_DHS_03042025_2114_120781/BDKR81DT/BDKR81FL.DTA")
 ## District names for clusters
-clusters <- read.csv("./gen/cluster-districts.csv")
+clusters <- read.csv("./gen/prepare-shp/output/cluster-districts.csv")
 ## Set covariate metadata
 covariate_metadata <- configure_covariate(
   name = "vas_ch",

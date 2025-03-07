@@ -342,12 +342,11 @@ fn_format_var <- function(x, covariate_metadata){
   
 
   x$district_name[x$district_name == "none"] <- NA
-  
   # format region name to match shape files
   x$region_name <- paste(toupper(substr(x$region_name, 1, 1)), substr(x$region_name, 2, nchar(x$region_name)), sep="")
   x$region_name[x$region_name == "None"] <- NA
-  x$region_name[x$region_name == "Barishal"] <- "Barisal"
-  x$region_name[x$region_name == "Chattogram"] <- "Chittagong"
+  #x$region_name[x$region_name == "Barishal"] <- "Barisal"
+  #x$region_name[x$region_name == "Chattogram"] <- "Chittagong"
   
   x <- x[order(x$admin_level, x$region_name, x$district_name),]
   
