@@ -37,5 +37,5 @@ p1 <- ggplot() +
   theme_bw() +
   labs(title = "Adm2 boundaries with geomasked survey clusters", color = "Legend") +
   scale_color_manual(values = c("EAPoints" = "red"))  # Customize point color
-ggsave("./gen/clusters.png", p1, width = 10, height = 7, dpi = 300)
+ggsave("./gen/prepare-shp/audit/clusters.png", p1, width = 10, height = 7, dpi = 300)
 
