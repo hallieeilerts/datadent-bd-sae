@@ -32,7 +32,7 @@ datLong <- data %>%
 p1 <- ggplot(datLong) +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
   facet_wrap(~indicator) 
-ggsave(str_glue("./indicator-compilation/audit/statcompiler-compare.pdf"), p1, height = 10, width = 8, units = "in") 
+ggsave(str_glue("./gen/indicator-compilation/audit/statcompiler-compare.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
 
