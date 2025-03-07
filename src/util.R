@@ -162,14 +162,25 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   
   x$var <- x$nt_ch_micro_vas
   x <- subset(x, !is.na(var))
+  
   return(x)
   
 }
 
 # Children age 6-59 mos given deworming medication
-fn_nt_ch_micro_dwm	<- function(x){
+fn_gen_nt_ch_micro_dwm	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
+  x$nt_ch_micro_dwm <- 0
+  x$nt_ch_micro_dwm[(x$h43 == 1)] <- 1
+  x$nt_ch_micro_dwm[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
+  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 0] <- "No"
+  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 1] <- "Yes"
+
+  x$var <- x$nt_ch_micro_dwm
+  x <- subset(x, !is.na(var))
+  
+  return(x)
   
 }
 
