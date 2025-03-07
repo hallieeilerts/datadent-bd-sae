@@ -20,7 +20,7 @@ statcompiler <- read.csv(paste0("./gen/indicator-compilation/audit/", dat_filena
 ################################################################################
 
 # Calculated indicators and stat compiler
-data <- merge(all_data, statcompiler, suffixes = c("", "_SC"), by = c("dhs_indicator_code"))
+data <- merge(all_data, statcompiler, suffixes = c("", "_SC"), by = c("dhs_indicator_code"), all.x = TRUE)
 data <- subset(data, admin_level == "adm0")
 data$value_SC <- data$value_SC/100
 
