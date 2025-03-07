@@ -4,8 +4,9 @@
 
 # Clusters ----------------------------------------------------------------
 
-source("./src/match-clusters-to-districts.R", local = new.env())
-source("./src/plot-clusters.R", local = new.env())
+source("./src/prepare-shp/rename-regions.R", local = new.env())
+source("./src/prepare-shp/match-clusters-to-districts.R", local = new.env())
+source("./src/prepare-shp/plot-clusters.R", local = new.env())
 
 # Calculate coverage indicators -------------------------------------------
 
