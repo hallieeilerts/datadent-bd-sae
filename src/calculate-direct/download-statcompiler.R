@@ -7,15 +7,12 @@ rm(list = ls())
 #' Libraries
 #' Inputs
 source("./src/util.R")
-dat_filename <- list.files("./gen/indicator-compilation/output")
-dat_filename <- dat_filename[grepl("indicators_data", dat_filename, ignore.case = TRUE)]
-dat_filename <- tail(sort(dat_filename), 1)
-all_dat <- read.csv(paste0("./gen/indicator-compilation/output/", dat_filename, sep = ""))
+direct <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 ################################################################################
 
 int_data_subfolder("dhs-statcompiler")
 
-all_dhs_indicator_code <- unique(all_dat$dhs_indicator_code)
+all_dhs_indicator_code <- unique(direct$dhs_indicator_code)
 all_dhs_indicator_code <- all_dhs_indicator_code[!is.na(all_dhs_indicator_code)]
 
 # download indicators via API
@@ -48,6 +45,6 @@ all_dat <- subset(all_dat, survey_id == "BD2022DHS")
 
 # Save --------------------------------------------------------------------
 
-write.csv(all_dat, paste("./gen/indicator-compilation/audit/statcompiler_",format(Sys.Date(), format="%Y%m%d"),".csv",sep = ""), row.names=FALSE)
+write.csv(all_dat, paste("./gen/calculate-direct/audit/statcompiler_",format(Sys.Date(), format="%Y%m%d"),".csv",sep = ""), row.names=FALSE)
 
 

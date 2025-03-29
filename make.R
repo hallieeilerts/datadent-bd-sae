@@ -1,34 +1,55 @@
 
+################################################
+# DataDENT Bangladesh nutrition intervention coverage
+################################################
 
+# Prepare shp files -------------------------------------------------------
 
-
-# Clusters ----------------------------------------------------------------
-
-source("./src/prepare-shp/rename-regions.R", local = new.env())
+source("./src/prepare-shp/rename-adm1-regions.R", local = new.env())
 source("./src/prepare-shp/match-clusters-to-districts.R", local = new.env())
 source("./src/prepare-shp/plot-clusters.R", local = new.env())
+source("./src/prepare-shp/create-adjacency-matrix.R", local = new.env())
 
-# Calculate coverage indicators -------------------------------------------
+# Prepare DHS data --------------------------------------------------------
 
-source("./src/indicators/vas-ch.R", local = new.env())
-source("./src/indicators/dwm-ch.R", local = new.env())
+source("./src/prepare-dhs/variables-kr.R", local = new.env())
+source("./src/prepare-dhs/variables-pr.R", local = new.env())
+source("./src/prepare-dhs/variables-hr.R", local = new.env())
+source("./src/prepare-dhs/create-input-child.R", local = new.env())
+source("./src/prepare-dhs/create-input-mother.R", local = new.env())
 
-# Compile and quality check indicators ------------------------------------
+# Calculate direct estimates ----------------------------------------------
 
-source("./src/indicator-compilation/compile-indicators.R", local = new.env())
-source("./src/indicator-compilation/download-statcompiler.R", local = new.env())
-source("./src/indicator-compilation/compare-statcompiler.R", local = new.env())
-source("./src/indicator-compilation/plot-coverage.R", local = new.env())
-
-
-
+source("./src/calculate-direct/calc-direct-child.R", local = new.env())
+source("./src/calculate-direct/calc-direct-mother.R", local = new.env())
+source("./src/calculate-direct/combine-direct.R", local = new.env())
+source("./src/calculate-direct/download-statcompiler.R", local = new.env())
+source("./src/calculate-direct/compare-statcompiler.R", local = new.env())
 
 
+# Model prep --------------------------------------------------------------
+
+source("./src/model/check-collinearity-mother.R", local = new.env())
+source("./src/model/check-collinearity-child.R", local = new.env())
+source("./src/model/check-predpower-mother.R", local = new.env())
+source("./src/model/check-predpower-child.R", local = new.env())
+source("./src/model/examine-priors.R", local = new.env())
+
+# Modeling ----------------------------------------------------------------
+
+source("./src/model/estimate-child.R", local = new.env())
+source("./src/model/estimate-mother.R", local = new.env())
+source("./src/model/predict-districts.R", local = new.env())
+source("./src/model/extract-fit-info.R", local = new.env())
+
+# Visualizations ----------------------------------------------------------
+
+source("./src/visualizations/plot-pred.R", local = new.env())
 
 # Notes -------------------------------------------------------------------
 
 
 
-# read wilson2020 closer to see if ok to extract jittered cluster locations as is
-# how to calculate variance? taylor seires?
+
+
 

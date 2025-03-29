@@ -139,12 +139,39 @@ fn_prepKR <- function(x){
 }
 
 
+fn_prepPR <- function(x){
+  
+  x$wt <- x$hv005/1000000
+  if("hv028" %in% names(x)){
+    x$wt_male <- x$hv028/1000000 # hv005 is household weight, hv028 is household weight for male subsample
+  }else{
+    x$wt_male <- NA
+  }
+  x$region_name <- haven::as_factor(x$hv024)
+
+  return(x)
+}
+
+fn_prepHR <- function(x){
+  
+  x$wt <- x$hv005/1000000
+  x$region_name <- haven::as_factor(x$hv024)
+  
+  return(x)
+}
+
+
+
+
 # Indicators --------------------------------------------------------------
 
 # Children age 6-59 mos given Vit. A supplements
 fn_gen_nt_ch_micro_vas	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
+  
+  x$age <- (x$v008 - x$b3)/12
+  x$age_months <- x$v008 - x$b3
   
   x$h33m2 <- x$h33m
   x$h33m2[x$h33m2 == 98] <- NA
@@ -160,8 +187,8 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 0] <- "No"
   x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 1] <- "Yes"
   
-  x$var <- x$nt_ch_micro_vas
-  x <- subset(x, !is.na(var))
+  #x$var <- x$nt_ch_micro_vas
+  #x <- subset(x, !is.na(var))
   
   return(x)
   
@@ -177,16 +204,171 @@ fn_gen_nt_ch_micro_dwm	<- function(x){
   x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 0] <- "No"
   x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 1] <- "Yes"
 
-  x$var <- x$nt_ch_micro_dwm
-  x <- subset(x, !is.na(var))
+  #x$var <- x$nt_ch_micro_dwm
+  #x <- subset(x, !is.na(var))
   
   return(x)
   
 }
 
+# BD 2022 doesn't have
+# Children aged 12-23m
+# Rotavirus 3rd dose vaccination according to either source
+fn_gen_ch_rotav3_either	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
+    mutate(rotav1 = case_when(h57 %in% c(1,2,3) ~ 1, h57%in%c(0,8) ~ 0  )) %>%
+    mutate(rotav2 = case_when(h58 %in% c(1,2,3) ~ 1, h58%in%c(0,8) ~ 0  )) %>%
+    mutate(rotav3 = case_when(h59 %in% c(1,2,3) ~ 1, h59%in%c(0,8) ~ 0  )) %>%
+    mutate(rotavsum= rotav1+rotav2+rotav3) %>%
+    mutate(ch_rotav3_either = case_when(rotavsum >=3 ~ "Yes", TRUE ~ "No" )) %>%
+    mutate(ch_rotav3_either = ifelse(vacage == 0, NA, ch_rotav3_either))
+    
+    return(x)
+}
+
+fn_gen_ch_meas_either	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
+    mutate(ch_meas_either = 
+           case_when(h9 %in% c(1,2,3) ~ "Yes", h9 %in% c(0,8) ~ "No")) %>%
+    mutate(ch_meas_either = ifelse(vacage == 0, NA, ch_meas_either))
+  
+  return(x)
+}
+
+# Exclusively breastfed - last-born under 6 months
+fn_gen_nt_ebf <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_IYCF.R
+  x <- x %>%
+    mutate(nt_bf_curr =
+             case_when(
+               m4==95  ~ 1 ,
+               m4 %in% c(93,94,98,99) ~ 0)) %>%
+    mutate(water  = case_when(v409==1  ~ 1 , v409!=1 ~ 0)) %>%
+    mutate(liquids= case_when(v409a==1 | v410==1 | v410a==1 | v412c==1 | v413==1 | v413a==1 | v413b==1 | v413c==1 | v413d==1  ~ 1 , 
+                              v409a!=1 | v410!=1 | v410a!=1 | v412c!=1 | v413!=1 | v413a!=1 | v413b!=1 | v413c!=1 | v413d!=1 ~ 0)) %>%
+    mutate(milk   = case_when(v411==1 | v411a==1 ~ 1 , v411!=1 | v411a!=1 ~ 0)) %>%
+    mutate(solids = case_when(v414a==1 | v414b==1 | v414c==1 | v414d==1 | v414e==1 | v414f==1 | v414g==1 | v414h==1 | v414i==1 | 
+                                v414j==1 | v414k==1 | v414l==1 | v414m==1 | v414n==1 | v414o==1 | v414p==1 | v414q==1 | v414r==1 | 
+                                v414s==1 | v414t==1 | v414u==1 | v414v==1 | v414w==1 | v412a==1 | v412b==1 | m39a==1 ~ 1 ,
+                              v414a!=1 | v414b!=1 | v414c!=1 | v414d!=1 | v414e!=1 | v414f!=1 | v414g!=1 | v414h!=1 | v414i!=1 | 
+                                v414j!=1 | v414k!=1 | v414l!=1 | v414m!=1 | v414n!=1 | v414o!=1 | v414p!=1 | v414q!=1 | v414r!=1 | 
+                                v414s!=1 | v414t!=1 | v414u!=1 | v414v!=1 | v414w!=1 | v412a!=1 | v412b!=1 | m39a!=1~ 0) ) %>%
+    mutate(nt_bf_status = case_when(nt_bf_curr==0 ~ 0, solids==1 ~ 5, milk==1 ~ 4, liquids==1 ~3, water==1 ~2, TRUE~1 )) %>%
+    mutate(nt_ebf =
+             case_when(
+               age<6 & nt_bf_status==1  ~ "Yes" ,
+               age<6 & nt_bf_status!=1 ~ "No")) 
+  
+  return(x)
+}
+
+
+# Mothers who received IYCF counseling in the last 6 months - NEW Indicator in DHS8
+fn_gen_nt_counsel_iycf	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
+  x$nt_counsel_iycf <- 0
+  x$nt_counsel_iycf[(x$v486 == 1)] <- 1
+  x$nt_counsel_iycf[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 0] <- "No"
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 1] <- "Yes"
+  
+  return(x)
+  
+}
+
+# Number of days women took iron supplements during last pregnancy
+fn_gen_nt_wm_micro_iron <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_WM_NUT.R
+  x$nt_wm_micro_iron <- NA
+  x$nt_wm_micro_iron[x$v208 == 0] <- NA
+  x$nt_wm_micro_iron[x$v45_1 == 0] <- 0
+  x$nt_wm_micro_iron[x$m46_1 < 60] <- 1
+  x$nt_wm_micro_iron[x$m46_1 >= 60 & x$m46_1 < 90] <- 2
+  x$nt_wm_micro_iron[x$m46_1 >= 90 & x$m46_1 < 300] <- 3
+  x$nt_wm_micro_iron[x$m46_1 >= 998 | x$m45_1 >= 8] <- NA
+  
+  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron >= 3] <- "Yes" # 90+ days
+  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron < 3] <-  "No"  # <90 days
+   
+  #set_value_labels(nt_wm_micro_iron = c("None"=0, "<60"=1, "60-89"=2, "90+"=3, "Don't know/missing"=4))
+  
+  return(x)
+}
+
+# ANC 4+ visits
+fn_gen_rh_anc_4vs <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(period = 60) %>%
+    mutate(age = b19_01) %>%
+    mutate(rh_anc_numvs =
+             case_when(
+               m14_1 == 0 ~ 0 ,
+               m14_1 == 1 ~ 1 ,
+               m14_1  %in% c(2,3)   ~ 2 ,
+               m14_1>=4 & m14_1<=90  ~ 3 ,
+               m14_1>90  ~ 9 ,
+               age>=period ~ 99 )) %>%
+    replace_with_na(replace = list(rh_anc_numvs = c(99))) %>%
+    mutate(rh_anc_4vs =
+             case_when(
+               rh_anc_numvs==3 ~ "Yes",
+               rh_anc_numvs %in% c(0,1,2,9) ~ "No" ))
+  
+  return(x)
+}
+
+# //Number of months pregnant at time of first ANC visit
+fn_gen_rh_anc_1tri	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <-  x %>%
+    mutate(rh_anc_moprg =
+                  case_when(
+                    m14_1 == 0 ~ 0 ,
+                    m13_1  %in% c(0,1,2,3)   ~ 1 ,
+                    m13_1  %in% c(4,5)  ~ 2 ,
+                    m13_1  %in% c(6,7)~ 3,
+                    m13_1>=8 & m13_1<=90 ~ 4, 
+                    m13_1>90 & m13_1<100 ~ 9 ,
+                    age>=period ~ 99 )) %>%
+    replace_with_na(replace = list(rh_anc_moprg = c(99))) %>%
+    mutate(rh_anc_1tri = 
+             case_when(
+               rh_anc_moprg == 1 ~ "Yes",
+               rh_anc_moprg %in% c(0,2,3,4,9) ~ "No" )
+             )
+  return(x)
+}
+
+
+# Indicator processing ----------------------------------------------------
 
 # Function to calculate weighted proportions for categorical variables
-fn_wtd_prop <- function(x) {
+fn_wtd_prop <- function(x, varname) {
+  
+  x$var <- varname
+  x <- subset(x, !is.na(var))
   
   # Create a list to store results for all admin levels
   results_list <- list()
@@ -235,8 +417,14 @@ fn_wtd_prop <- function(x) {
   return(final_result)
 }
 
-fn_var_taylor <- function(x, admin_levels = c("adm0", "adm1", "adm2")){
+#x <- dat
+#varname <- "ch_rotav3_either"
 
+fn_var_taylor <- function(x, varname, admin_levels = c("adm0", "adm1", "adm2")){
+
+  x$var <- x[,varname]
+  x <- subset(x, !is.na(var))
+  
   # List to store variance results for each admin level
   results_list <- list()
 
@@ -302,6 +490,8 @@ fn_var_taylor <- function(x, admin_levels = c("adm0", "adm1", "adm2")){
   # Combine results into a single dataframe
   final_variance_results <- bind_rows(results_list)
 
+  final_variance_results$indicator <- varname
+  
   return(final_variance_results)
 
 }
@@ -365,3 +555,56 @@ fn_format_var <- function(x, covariate_metadata){
   
 }
 
+# Predict posterior -------------------------------------------------------
+
+fn_pred <- function(fit, dat, outcome){
+  # Generate posterior predictive samples for individual-level predictions
+  posterior_preds <- posterior_predict(fit)
+  
+  # Create a new column to hold the mean of predicted probabilities for each individual
+  dat$predictions <- apply(posterior_preds, 2, mean)
+  
+  # Summarize individual-level predictions at the district level
+  district_preds <- dat %>%
+    group_by(district) %>%
+    summarize(
+      value = mean(predictions),
+      lower = quantile(predictions, 0.025),  # 2.5% quantile (lower bound)
+      upper = quantile(predictions, 0.975)   # 97.5% quantile (upper bound)
+    )
+  
+  district_preds$indicator <- outcome_name
+  
+  return(district_preds)
+}
+
+
+weighted_quantile <- function(x, w, probs) {
+  ord <- order(x)
+  x_sorted <- x[ord]
+  w_sorted <- w[ord]
+  cum_w <- cumsum(w_sorted) / sum(w_sorted)
+  approx(cum_w, x_sorted, xout = probs, rule = 2)$y
+}
+
+# accounts for survey weights in aggregation to district level
+fn_pred_wtd <- function(fit, dat, outcome){
+  # Generate posterior predictive samples for individual-level predictions
+  posterior_preds <- posterior_predict(fit)
+  
+  # Create a new column to hold the mean of predicted probabilities for each individual
+  dat$predictions <- apply(posterior_preds, 2, mean)
+  
+  # Summarize individual-level predictions at the district level
+  district_preds <- dat %>%
+    group_by(district) %>%
+    summarise(
+      lower =  weighted_quantile(predictions, wt, 0.025),
+      value =  weighted_quantile(predictions, wt, 0.50),
+      upper =  weighted_quantile(predictions, wt, 0.975)
+    )
+    
+  district_preds$indicator <- outcome_name
+  
+  return(district_preds)
+}

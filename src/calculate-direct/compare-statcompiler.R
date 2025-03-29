@@ -8,19 +8,16 @@ rm(list = ls())
 #' Inputs
 source("./src/util.R")
 # Manually calculated indicators
-dat_filename <- list.files("./gen/indicator-compilation/output")
-dat_filename <- dat_filename[grepl("indicators_data", dat_filename, ignore.case = TRUE)]
-dat_filename <- tail(sort(dat_filename), 1)
-all_data <- read.csv(paste0("./gen/indicator-compilation/output/", dat_filename, sep = ""))
+direct <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 # StatCompiler
-dat_filename <- list.files("./gen/indicator-compilation/audit")
+dat_filename <- list.files("./gen/calculate-direct/audit")
 dat_filename <- dat_filename[grepl("statcompiler", dat_filename, ignore.case = TRUE)]
 dat_filename <- tail(sort(dat_filename), 1)
-statcompiler <- read.csv(paste0("./gen/indicator-compilation/audit/", dat_filename, sep = ""))
+statcompiler <- read.csv(paste0("./gen/calculate-direct/audit/", dat_filename, sep = ""))
 ################################################################################
 
 # Calculated indicators and stat compiler
-data <- merge(all_data, statcompiler, suffixes = c("", "_SC"), by = c("dhs_indicator_code"), all.x = TRUE)
+data <- merge(direct, statcompiler, suffixes = c("", "_SC"), by = c("dhs_indicator_code"), all.x = TRUE)
 data <- subset(data, admin_level == "adm0")
 data$value_SC <- data$value_SC/100
 
@@ -32,7 +29,7 @@ datLong <- data %>%
 p1 <- ggplot(datLong) +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
   facet_wrap(~indicator) 
-ggsave(str_glue("./gen/indicator-compilation/audit/statcompiler-compare.pdf"), p1, height = 10, width = 8, units = "in") 
+ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
 
