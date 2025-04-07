@@ -5,6 +5,7 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(survey)
 #' Inputs
 source("./src/util.R")
 dat <- read.csv("./gen/prepare-dhs/output/dat-child.csv")

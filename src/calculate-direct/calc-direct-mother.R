@@ -5,6 +5,7 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(survey)
 #' Inputs
 source("./src/util.R")
 dat <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
@@ -19,7 +20,6 @@ dat_anc4$dhs_indicator_code <- "RH_ANCN_W_N4P"
 
 dat_anc1tri <- fn_var_taylor(dat, "rh_anc_1tri")
 dat_anc1tri$dhs_indicator_code <- NA
-
 
 # rbind results if multiple
 res <- rbind(dat_iron, dat_anc4, dat_anc1tri)

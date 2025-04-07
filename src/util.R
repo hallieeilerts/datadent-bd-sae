@@ -161,9 +161,8 @@ fn_prepHR <- function(x){
 }
 
 
+# KR variables ------------------------------------------------------------
 
-
-# Indicators --------------------------------------------------------------
 
 # Children age 6-59 mos given Vit. A supplements
 fn_gen_nt_ch_micro_vas	<- function(x){
@@ -294,6 +293,9 @@ fn_gen_nt_counsel_iycf	<- function(x){
   
 }
 
+
+# IR variables ------------------------------------------------------------
+
 # Number of days women took iron supplements during last pregnancy
 fn_gen_nt_wm_micro_iron <- function(x){
   
@@ -360,6 +362,15 @@ fn_gen_rh_anc_1tri	<- function(x){
              )
   return(x)
 }
+
+fn_gen_fp_cusm_w_mod <- function(x){
+  
+}
+
+fn_gen_fp_cusy_w_mod <- function(x){
+  
+}
+
 
 
 # Indicator processing ----------------------------------------------------
@@ -490,7 +501,7 @@ fn_var_taylor <- function(x, varname, admin_levels = c("adm0", "adm1", "adm2")){
   # Combine results into a single dataframe
   final_variance_results <- bind_rows(results_list)
 
-  final_variance_results$indicator <- varname
+  final_variance_results$outcome <- varname
   
   return(final_variance_results)
 
@@ -588,7 +599,7 @@ weighted_quantile <- function(x, w, probs) {
 }
 
 # accounts for survey weights in aggregation to district level
-fn_pred_wtd <- function(fit, dat, outcome){
+fn_pred_wtd <- function(fit, dat){
   # Generate posterior predictive samples for individual-level predictions
   posterior_preds <- posterior_predict(fit)
   
@@ -596,15 +607,25 @@ fn_pred_wtd <- function(fit, dat, outcome){
   dat$predictions <- apply(posterior_preds, 2, mean)
   
   # Summarize individual-level predictions at the district level
-  district_preds <- dat %>%
-    group_by(district) %>%
-    summarise(
-      lower =  weighted_quantile(predictions, wt, 0.025),
-      value =  weighted_quantile(predictions, wt, 0.50),
-      upper =  weighted_quantile(predictions, wt, 0.975)
-    )
-    
-  district_preds$indicator <- outcome_name
+  if(grepl("weights", paste0(fit$formula)[1])){
+    district_preds <- dat %>%
+      group_by(district) %>%
+      summarise(
+        lower =  weighted_quantile(predictions, wt, 0.025),
+        value =  weighted_quantile(predictions, wt, 0.50),
+        upper =  weighted_quantile(predictions, wt, 0.975)
+      )
+  }else{
+    district_preds <- dat %>%
+      group_by(district) %>%
+      summarise(
+        lower =  quantile(predictions, 0.025),
+        value =  quantile(predictions, 0.50),
+        upper =  quantile(predictions, 0.975)
+      )
+  }
+  
+  
   
   return(district_preds)
 }

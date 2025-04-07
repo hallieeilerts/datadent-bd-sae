@@ -14,6 +14,15 @@ source("./src/util.R")
 dhs_data <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
 ################################################################################
 
+# convert character covariates
+dhs_data$residence[dhs_data$residence == "urban"] <- 1
+dhs_data$residence[dhs_data$residence == "rural"] <- 2
+dhs_data$residence <- as.numeric(dhs_data$residence)
+dhs_data$residence[dhs_data$residence == "urban"] <- 1
+dhs_data$residence[dhs_data$residence == "rural"] <- 2
+dhs_data$residence <- as.numeric(dhs_data$residence)
+
+
 outcome <- c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri")
 vcov <- c("residence",
           "hhd_under5", "hhd_head_sex", "hhd_head_age",
@@ -39,12 +48,13 @@ for(i in 1:length(vcov)){
   formula <- as.formula(paste0("nt_wm_micro_iron ~ ", vcov[i]))
   fit <- summary(glm(formula, data = dhs_data))
   res <- data.frame(cov = vcov[i],
+                    coef = fit$coefficients[2,1],
                     pvalue = fit$coefficients[2,4])
   results <- rbind(results, res)
 }
 results1 <- results
 results1$outcome <- "nt_wm_micro_iron"
-results1 <- results1[,c("outcome", "cov", "pvalue")]
+results1 <- results1[,c("outcome", "cov", "coef", "pvalue")]
 results1
 
 # rh_anc_4vs --------------------------------------------------------
@@ -66,12 +76,13 @@ for(i in 1:length(vcov)){
   formula <- as.formula(paste0("rh_anc_4vs ~ ", vcov[i]))
   fit <- summary(glm(formula, data = dhs_data))
   res <- data.frame(cov = vcov[i],
+                    coef = fit$coefficients[2,1],
                     pvalue = fit$coefficients[2,4])
   results <- rbind(results, res)
 }
 results2 <- results
 results2$outcome <- "rh_anc_4vs"
-results2 <- results2[,c("outcome", "cov", "pvalue")]
+results2 <- results2[,c("outcome", "cov", "coef",  "pvalue")]
 results2
 
 # rh_anc_1tri --------------------------------------------------------
@@ -93,23 +104,32 @@ for(i in 1:length(vcov)){
   formula <- as.formula(paste0("rh_anc_1tri ~ ", vcov[i]))
   fit <- summary(glm(formula, data = dhs_data))
   res <- data.frame(cov = vcov[i],
+                    coef = fit$coefficients[2,1],
                     pvalue = fit$coefficients[2,4])
   results <- rbind(results, res)
 }
 results3 <- results
 results3$outcome <- "rh_anc_1tri"
-results3 <- results3[,c("outcome", "cov", "pvalue")]
+results3 <- results3[,c("outcome", "cov", "coef", "pvalue")]
 results3
 
 # Plot associations -------------------------------------------------------
 
 all_res <- rbind(results1, results2, results3)
 
-all_res %>%
+p <- all_res %>%
   ggplot() +
   geom_bar(aes(x=cov, y = pvalue), stat = "identity") +
   facet_wrap(~outcome) +
   coord_flip()
+ggsave(paste0("./gen/prepare-model/output/pvalue-mother-iron.png"), p, width = 8, height = 6)
+
+p <- all_res %>%
+  ggplot() +
+  geom_bar(aes(x=cov, y = coef), stat = "identity") +
+  facet_wrap(~outcome) +
+  coord_flip()
+ggsave(paste0("./gen/prepare-model/output/coef-mother-iron.png"), p, width = 8, height = 6)
 
 # Stepwise ----------------------------------------------------------------
 

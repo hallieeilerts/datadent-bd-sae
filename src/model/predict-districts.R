@@ -16,28 +16,24 @@ spatial_cor_matrix <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
 # load vitamin A model output
 dat_filename <- list.files("./gen/model/output/")
 dat_filename <- dat_filename[grepl("ModelOutputChild-VAS", dat_filename, ignore.case = TRUE)]
-#dat_filename <- tail(sort(dat_filename),1) # Most recent
 vas <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
-  # Visualize the posterior distributions of the fixed effects
-  #plot(fit)
   # predict district prevalence
-  vas[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  vas[[i]]$model <- paste0(vers,"-", test)
+  vas[[i]] <- fn_pred_wtd(fit, dat)
+  vas[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 vas <- do.call(rbind, vas)
 
 # load deworming model output
 dat_filename <- list.files("./gen/model/output/")
 dat_filename <- dat_filename[grepl("ModelOutputChild-DWM", dat_filename, ignore.case = TRUE)]
-#dat_filename <- tail(sort(dat_filename),1) # Most recent
 dwm <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  dwm[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  dwm[[i]]$model <- paste0(vers,"-",test)
+  dwm[[i]] <- fn_pred_wtd(fit, dat)
+  dwm[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 dwm <- do.call(rbind, dwm)
 
@@ -48,22 +44,20 @@ exbf <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  exbf[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  exbf[[i]]$model <- paste0(vers,"-",test)
+  exbf[[i]] <- fn_pred_wtd(fit, dat)
+  exbf[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 exbf <- do.call(rbind, exbf)
 
-
-# load pregnant women iron supplements model output
+# load iron supplements for pregnant women
 dat_filename <- list.files("./gen/model/output/")
 dat_filename <- dat_filename[grepl("ModelOutputMother-Iron", dat_filename, ignore.case = TRUE)]
-#dat_filename <- tail(sort(dat_filename),1) # Most recent
 iron <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  iron[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  iron[[i]]$model <- paste0(vers,"-",test)
+  iron[[i]] <- fn_pred_wtd(fit, dat)
+  iron[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 iron <- do.call(rbind, iron)
 
@@ -74,8 +68,8 @@ anc4 <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  anc4[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  anc4[[i]]$model <- paste0(vers,"-",test)
+  anc4[[i]] <- fn_pred_wtd(fit, dat)
+  anc4[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 anc4 <- do.call(rbind, anc4)
 
@@ -86,15 +80,20 @@ anc1t <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  anc1t[[i]] <- fn_pred_wtd(fit, dat, outcome_name)
-  anc1t[[i]]$model <- paste0(vers,"-",test)
+  anc1t[[i]] <- fn_pred_wtd(fit, dat)
+  anc1t[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 anc1t <- do.call(rbind, anc1t)
-
 
 district_preds <- rbind(vas, dwm, exbf, iron, anc4, anc1t)
 
 # Save --------------------------------------------------------------------
 
+write.csv(district_preds, paste0("./gen/model/output/predictions.csv"), row.names = FALSE)
+
+# Only update one
+district_preds <- read.csv("./gen/model/output/predictions.csv")
+district_preds <- district_preds[!grepl("iron", district_preds$file, ignore.case = TRUE),]
+district_preds <- rbind(district_preds, iron)
 write.csv(district_preds, paste0("./gen/model/output/predictions.csv"), row.names = FALSE)
 

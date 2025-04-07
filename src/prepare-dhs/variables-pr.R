@@ -19,6 +19,8 @@ clusters <- read.csv("./gen/prepare-shp/output/cluster-districts.csv")
 # calculate sampling weight
 dat$wt <- dat$hv005/1000000
 
+# NONE CURRENTLY NEEDED
+
 # merge on district names
 dat <- merge(dat, clusters, by.x = "hv001", by.y = "DHSCLUSTER")
 

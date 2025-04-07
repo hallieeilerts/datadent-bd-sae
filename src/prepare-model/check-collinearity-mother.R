@@ -43,7 +43,26 @@ which(cor_mat > 0.7)
 which(cor_mat < -0.7)
 cor_mat[which(cor_mat > 0.7)]
 # the only high ones are the diagonals
+cor_mat[cor_mat == 1] <- NA
+cor_mat[upper.tri(cor_mat)] <- NA
 
+# Convert matrix to a data frame
+mat_df <- reshape2::melt(cor_mat)  # Converts to long format
+
+# Define a custom color scale with multiple breakpoints
+neg_color <- viridis(10, option = "B")[2]  # Dark blue for negative values
+zero_color <- "white"                      # White for zero
+pos_color <- viridis(10, option = "B")[9]  # Yellow for positive values
+
+# Plot using ggplot2
+p0 <- ggplot(mat_df, aes(x = Var2, y = Var1, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = neg_color, mid = zero_color, high = pos_color, midpoint = 0) +
+  theme_bw() +
+  labs(fill = "Pearson cor.", x= "", y = "") +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 90))
+ggsave(paste0("./gen/prepare-model/output/correlation-mother-iron.png"), p0, width = 6, height = 6)
 
 # rh_anc4vs ---------------------------------------------------------------
 

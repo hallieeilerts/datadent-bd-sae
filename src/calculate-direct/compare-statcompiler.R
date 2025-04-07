@@ -22,13 +22,13 @@ data <- subset(data, admin_level == "adm0")
 data$value_SC <- data$value_SC/100
 
 datLong <- data %>%
-  select(indicator, value, value_SC) %>%
+  dplyr::select(outcome, value, value_SC) %>%
   pivot_longer(c(value, value_SC)) %>%
   mutate(series = ifelse(endsWith(name, '_SC'), "StatCompiler", "Calculated"))
 
 p1 <- ggplot(datLong) +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
-  facet_wrap(~indicator) 
+  facet_wrap(~outcome) 
 ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
