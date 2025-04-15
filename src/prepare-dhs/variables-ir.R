@@ -34,8 +34,7 @@ dat_var <- dat_var %>%
   mutate(region_name = haven::as_factor(v024)) %>%
   mutate(residence = haven::as_factor(v025)) %>%
   rename(mother_edu = v106,
-         mother_ln = v003) %>%
-  select(-v024)
+         mother_ln = v003) 
 
 # Save --------------------------------------------------------------------
 

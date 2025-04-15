@@ -33,10 +33,9 @@ vers <- "013"
 test <- "Test1"
 # define priors
 priors <- c(
-  prior(normal(0, 2), class = "sd"), # Prior for sd of random intercepts per district
-  prior(cauchy(0, 5), class = "sds") # Prior for sd of spatial random effects
+  prior(cauchy(0, 2), class = "sds") # Prior for sd of spatial random effects
 )
-
+priors <- NULL
 
 # limit to columns of interest
 dat <- dhs_data[,c(outcome, "district","wt")]
@@ -45,8 +44,8 @@ dat$district <- as.factor(dat$district)
 dat <- na.omit(dat) 
 
 # model formula
-#formula <- bf(paste0(outcome, " ~ (1 | district)"))
-formula <- bf(paste0(outcome, " | weights(wt) ~ (1 | district) + s(district, bs = 're', sp = spatial_cor_matrix)"))
+#formula <- bf(paste0(outcome, " ~ (1 | district)")) # this would be district-level RE
+formula <- bf(paste0(outcome, " | weights(wt) ~ s(district, bs = 're', sp = spatial_cor_matrix)"))
 
 # Fit model
 Start <- Sys.time()

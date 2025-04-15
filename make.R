@@ -8,6 +8,7 @@
 source("./src/prepare-shp/rename-adm1-regions.R", local = new.env())
 source("./src/prepare-shp/match-clusters-to-districts.R", local = new.env())
 source("./src/prepare-shp/plot-clusters.R", local = new.env())
+source("./src/prepare-shp/create-corr-matrix.R", local = new.env())
 source("./src/prepare-shp/create-adjacency-matrix.R", local = new.env())
 
 # Prepare DHS data --------------------------------------------------------
@@ -17,6 +18,7 @@ source("./src/prepare-dhs/variables-ir.R", local = new.env())
 source("./src/prepare-dhs/variables-hr.R", local = new.env())
 source("./src/prepare-dhs/create-input-child.R", local = new.env())
 source("./src/prepare-dhs/create-input-mother.R", local = new.env())
+source("./src/prepare-dhs/create-input-district.R", local = new.env())
 
 # Calculate direct estimates ----------------------------------------------
 

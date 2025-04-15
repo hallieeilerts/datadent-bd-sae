@@ -16,8 +16,6 @@ source("./src/util.R")
 # all model outputs
 dat_filename <- list.files("./gen/model/output/")
 dat_filename <- dat_filename[grepl("ModelOutput", dat_filename, ignore.case = TRUE)]
-# spatial correlation
-spatial_cor_matrix <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
 ################################################################################
 
 all_models <- data.frame()
@@ -79,7 +77,7 @@ fit %>%
   spread_draws(r_district[district,term]) %>%
   head(10)
 fit %>%
-  spread_draws(b_Intercept) %>%
+  spread_draws(sds_sdistrict_1) %>%
   head(10)
 fit %>%
   spread_draws(b_Intercept, sd) %>%
@@ -118,3 +116,48 @@ gelman.diag(modelposterior[, 1:4])
 
 # autocorrelation plot
 stanplot(model, pars = 1:4, type = "acf")
+
+
+
+library(modelr)
+library(tidybayes)
+library(distributional)
+dat %>% 
+  data_grid(district) %>%
+  add_epred_draws(fit) %>%
+  head(10)
+
+dat %>%
+  data_grid(district) %>%
+  add_predicted_draws(fit) %>%
+  ggplot(aes(x = .prediction, y = district)) +
+  stat_slab()
+
+dat %>%
+  data_grid(district) %>%
+  add_epred_draws(fit) %>%
+  ggplot(aes(x = .epred, y = district)) +
+  stat_slab()
+
+dat %>%
+  data_grid(district) %>%
+  add_epred_draws(fit) %>%
+  ggplot(aes(x = .epred, y = district)) +
+  stat_pointinterval(.width = c(.025, .975))
+
+dat %>%
+  add_epred_draws(fit) %>%
+  ggplot(aes(x = .epred, y = district)) +
+  stat_pointinterval(.width = c(.025, .975))
+
+dat %>%
+  data_grid(district) %>%
+  add_epred_draws(fit, dpar = TRUE, value = "response") %>%
+  sample_draws(30) %>%
+  ggplot(aes(y = district)) +
+  stat_slab(aes(xdist = dist_normal(mu)), 
+            slab_color = "gray65", alpha = 1/10, fill = NA
+  ) +
+  geom_point(aes(x = response), data = dat, shape = 21, fill = "#9ECAE1", size = 2)
+
+

@@ -20,6 +20,9 @@ mother_covar <- ir %>%
 dat <- kr %>%
   left_join(mother_covar, by = c("v001", "v002", "mother_ln")) 
 
+
+# !!!NOTE: need to remove wt and district from hr file!!!
+
 # merge to household covariates
 dat <- dat %>%
   left_join(hr, by = c("v001" = "hv001", "v002" = "hv002"))

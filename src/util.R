@@ -427,6 +427,35 @@ fn_wtd_prop <- function(x, varname) {
   
   return(final_result)
 }
+fn_wtd_prop2 <- function(x, varname) {
+  
+  x$varname <- x[,varname]
+
+  x <- subset(x, !is.na(varname))
+  
+  # Create a list to store results for all admin levels
+  results_list <- list()
+  
+  x_modified <- x %>%
+      mutate(district_name = district)
+    
+    # Compute weighted proportion
+    suppressMessages({
+      result <- x_modified %>%
+        group_by(district_name, varname) %>%
+        dplyr::summarise(n = sum(wt), .groups = "drop") %>%
+        group_by(district_name) %>%
+        mutate(per = n / sum(n)) %>%
+        filter(!is.na(per)) %>%
+        select(-n)
+    })
+  
+  
+  return(result)
+}
+
+
+
 
 #x <- dat
 #varname <- "ch_rotav3_either"
@@ -625,7 +654,59 @@ fn_pred_wtd <- function(fit, dat){
       )
   }
   
-  
-  
   return(district_preds)
+}
+
+fn_pred2 <- function(fit, dat){
+
+  individual_draws <- dat %>%
+    add_epred_draws(fit)
+  
+  if(grepl("weights", paste0(fit$formula)[1])){
+    
+    district_preds <- individual_draws %>%
+      group_by(district, .draw) %>%
+      summarise(mean_pred = weighted.mean(.epred, wt), .groups = "drop")
+    
+  }else{
+    
+    district_preds <- individual_draws %>%
+      group_by(district, .draw) %>%
+      summarise(mean_pred = mean(.epred), .groups = "drop")
+    
+  }
+  
+  district_summary <- district_preds %>%
+    group_by(district) %>%
+    summarise(
+      lower = quantile(mean_pred, 0.025),
+      value = quantile(mean_pred, 0.5),
+      upper = quantile(mean_pred, 0.975)
+    )
+  
+  
+  return(district_summary)
+  
+}
+
+fn_areal_pred <- function(fit, dat){
+  
+  # get posterior predictions
+  posterior_preds <- posterior_predict(fit)
+  
+  # For example, you can compute the mean and credible intervals (e.g., 95% CI) of the predictions:
+  pred_summary <- apply(posterior_preds, 2, function(x) {
+    c(mean = mean(x), lower = quantile(x, 0.025), upper = quantile(x, 0.975))
+  })
+  row.names(pred_summary) <- c("mean", "lower", "upper")
+
+  pred_summary_df <- data.frame(
+    district = dat$district,
+    lower = pred_summary["lower", ],
+    value = pred_summary["mean", ],
+    upper = pred_summary["upper", ]
+  )
+  
+  
+  return(pred_summary_df)  
 }

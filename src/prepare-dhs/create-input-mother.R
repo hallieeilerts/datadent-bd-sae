@@ -21,9 +21,13 @@ hr <- readRDS("./gen/prepare-dhs/temp/variables-hr.rds")
 # dat <- ir %>%
 #   left_join(mother_covar, by = c("v001", "v002", "mother_ln")) 
 
+# !!!NOTE: need to remove wt and district from hr file!!!
+
 # merge mother covariates and outcomes to household variables
+hr_merge <- hr %>%
+  select(-c(district, wt))
 dat <- ir %>%
-  left_join(hr, by = c("v001" = "hv001", "v002" = "hv002"))
+  left_join(hr_merge, by = c("v001" = "hv001", "v002" = "hv002"))
 
 # Save --------------------------------------------------------------------
 

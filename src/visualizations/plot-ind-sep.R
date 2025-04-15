@@ -57,12 +57,22 @@ dat_ind <- subset(dat_ind, plotlabel != "8-Test2")
 dat_ind <- subset(dat_ind, plotlabel != "9-Test2")
 dat_ind <- subset(dat_ind, plotlabel != "11-Test3")
 
-
 dodge_width <- 0.8
 v_dist <- unique(dat_ind$ADM2_EN)[5:9]
 dat_ind$plotlabel <- factor(dat_ind$plotlabel, levels = unique(dat_ind$plotlabel))
 
-p0 <- dat_ind %>%
+dat_ind %>%
+  filter(plotlabel %in% c("Direct", "15-Test1", "16-Test4")) %>%
+  ggplot(aes(x = ADM2_EN, y = value, color = plotlabel, group = plotlabel)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = dodge_width), width = 0.2) +
+  geom_point(position = position_dodge(width = dodge_width)) +
+  labs(x = "", y = "") +
+  theme_bw() +
+  coord_flip() +
+  theme(text = element_text(size = 10), legend.title=element_blank())
+
+
+dat_ind %>%
   filter(ADM2_EN %in% v_dist) %>%
   ggplot(aes(x = ADM2_EN, y = value, color = plotlabel, group = plotlabel)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = dodge_width), width = 0.2) +
@@ -71,6 +81,8 @@ p0 <- dat_ind %>%
   theme_bw() +
   coord_flip() +
   theme(text = element_text(size = 10), legend.title=element_blank())
+
+
 
 ggsave(paste0("./gen/visualizations/temp/ui-nt_wm_micro_iron2.png"), p0, width = 10, height = 8)
 

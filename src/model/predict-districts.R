@@ -11,6 +11,7 @@ library(brms)
 source("./src/util.R")
 # spatial correlation
 spatial_cor_matrix <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
+W <- as.matrix(readRDS("./gen/prepare-shp/output/adjacency_b_matrix.rds"))
 ################################################################################
 
 # load vitamin A model output
@@ -52,11 +53,13 @@ exbf <- do.call(rbind, exbf)
 # load iron supplements for pregnant women
 dat_filename <- list.files("./gen/model/output/")
 dat_filename <- dat_filename[grepl("ModelOutputMother-Iron", dat_filename, ignore.case = TRUE)]
+dat_filename <- dat_filename[33]
 iron <- list()
 for(i in 1:length(dat_filename)){
   load(paste0("./gen/model/output/",dat_filename[i]))
   # predict district prevalence
-  iron[[i]] <- fn_pred_wtd(fit, dat)
+  #iron[[i]] <- fn_pred_wtd(fit, dat)
+  iron[[i]] <- fn_areal_pred(fit, dat)
   iron[[i]]$file <- gsub(".RData", "", dat_filename[i])
 }
 iron <- do.call(rbind, iron)
@@ -93,7 +96,8 @@ write.csv(district_preds, paste0("./gen/model/output/predictions.csv"), row.name
 
 # Only update one
 district_preds <- read.csv("./gen/model/output/predictions.csv")
-district_preds <- district_preds[!grepl("iron", district_preds$file, ignore.case = TRUE),]
+#district_preds <- district_preds[!grepl("iron", district_preds$file, ignore.case = TRUE),]
+#district_preds <- subset(district_preds, file != "ModelOutputMother-Iron_016-Test1_20250409")
 district_preds <- rbind(district_preds, iron)
 write.csv(district_preds, paste0("./gen/model/output/predictions.csv"), row.names = FALSE)
 
