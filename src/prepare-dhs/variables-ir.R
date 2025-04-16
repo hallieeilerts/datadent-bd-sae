@@ -28,7 +28,7 @@ dat_var <- fn_gen_rh_anc_4vs(dat_var)
 dat_var <- fn_gen_rh_anc_1tri(dat_var)
 
 dat_var <- dat_var %>%
-  select(ADM2_EN, v001, v002, v003, v021, v022, v024, v025, v106, 
+  select(ADM2_EN, v001, v002, v003, v023, v024, v025, v106, 
          nt_wm_micro_iron, rh_anc_4vs, rh_anc_1tri, wt) %>%
   mutate(region_name = as.character(as_factor(v024))) %>%
   mutate(residence = as.character(as_factor(v025))) %>%

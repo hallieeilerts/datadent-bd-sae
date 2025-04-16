@@ -5,7 +5,13 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
-
+library(sf)
+library(dplyr)
+library(tidyr)
+library(here)
+library(cmdstanr)
+library(wesanderson)
+library(ggplot2)
 #' Inputs
 source("./src/util.R")
 # direct estimates and variance
@@ -20,7 +26,7 @@ prep <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
 ind_dist <- subset(est, variable == "nt_wm_micro_iron")
 
 # Choose model to run, 'BYM2' for area-level variance smoothing model, and 'binom_BYM2' for area/cluster level binomial model 
-model_name = 'BYM2' # "binom_BYM2"
+model_name = "BYM2" # "binom_BYM2"
 
 # Give adm2_index
 bangladesh_2$district_id <- 1:nrow(bangladesh_2)
@@ -92,11 +98,6 @@ for (param in colnames(df_p)[1:10]){
     geom_line() + theme_minimal() 
   print(gg)
 }
-
-
-
-ind_dist$post_mean <- df_p[,1:nrow(ind_dist)] |> colMeans() |> unname()
-ind_dist$post_var <-  sapply(df_p[,1:nrow(ind_dist)],var) |> unname()
 for (param in colnames(df_v)[1:10]){
   dat = df_v
   gg = ggplot(data=dat, aes_string(x=".iteration", y = param, color="chain"))+
@@ -104,10 +105,19 @@ for (param in colnames(df_v)[1:10]){
   print(gg)
 }
 
+
+ind_dist$post_mean <- df_p[,1:nrow(ind_dist)] |> colMeans() |> unname()
+ind_dist$post_var <-  sapply(df_p[,1:nrow(ind_dist)],var) |> unname()
+
 ind_dist$naive <- ind_dist$naive * 100
 ind_dist$dir <- ind_dist$dir * 100
 ind_dist$post_mean <- ind_dist$post_mean * 100
 
+# what if i get uncertainty intervals from posterior distribution and not using predicted variance?
+ind_dist$post_lb <- df_p[, 1:nrow(ind_dist)] |> apply(2, quantile, probs = 0.025) |>  unname()
+ind_dist$post_ub <- df_p[, 1:nrow(ind_dist)] |> apply(2, quantile, probs = 0.975) |>  unname()
+ind_dist$post_lb <- ind_dist$post_lb * 100
+ind_dist$post_ub <- ind_dist$post_ub * 100
 
 # plot prevalence ---------------------------------------------------------
 
@@ -233,3 +243,37 @@ var %>%
   ggplot() +
   geom_point(aes(x=district, y = value, col = name, shape = name)) +
   coord_flip()
+
+ci <- data.frame(district = ind_dist$ADM2_EN,
+                 dir = ind_dist$dir,
+                 pred = ind_dist$post_mean,
+                 dir_var = ind_dist$dir_var,
+                 pred_var = ind_dist$post_var)
+ci$dir_se <- sqrt(ci$dir_var) * 100
+ci$pred_se <- sqrt(ci$pred_var) * 100
+
+ci_long <- ci %>%
+  pivot_longer(
+    cols = c(dir,pred),
+  ) %>%
+  mutate(lb = ifelse(name == "dir", value - 1.96*dir_se, value - 1.96*pred_se),
+         ub = ifelse(name == "dir", value + 1.96*dir_se, value + 1.96*pred_se))
+
+# add uncertainty intervals from posterior distribution (not predicted variance)
+add_pred <- data.frame(name = "pred-quant",
+           district = ind_dist$ADM2_EN,
+           value = ind_dist$post_mean,
+           lb = ind_dist$post_lb,
+           ub = ind_dist$post_ub)
+ci_long <- bind_rows(ci_long, add_pred)
+
+ci_long %>%
+  ggplot(aes(x = district, y = value, color = name, group = name)) +
+  geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.8), width = 0.2) +
+  geom_point(position = position_dodge(width = 0.8)) +
+  labs(x = "", y = "") +
+  theme_bw() +
+  coord_flip() +
+  theme(text = element_text(size = 10), legend.title=element_blank())
+
+

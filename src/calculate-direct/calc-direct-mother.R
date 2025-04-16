@@ -30,10 +30,15 @@ naive_var <- dhs %>%
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
 
-dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
-                                    strata = "region_name", # division
+# dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
+#                                     strata = "region_name", # division
+#                                     weights = "wt",
+#                                     nest = TRUE)
+dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
+                                    strata = "v023", # strata for sampling
                                     weights = "wt",
                                     nest = TRUE)
+
 dir <- dhs_svy %>% 
   group_by(ADM2_EN) %>% 
   summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),

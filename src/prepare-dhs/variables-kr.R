@@ -30,7 +30,7 @@ dat_var <- fn_gen_nt_ch_micro_dwm(dat_var)
 dat_var <- fn_gen_nt_ebf(dat_var)
 
 dat_var <- dat_var %>%
-  select(ADM2_EN, v001, v002, v003, v021, v022, v024, v025, b16, 
+  select(ADM2_EN, v001, v002, v003, v023, v024, v025, b16, 
          nt_ch_micro_vas, nt_ch_micro_dwm, nt_ebf, wt) %>%
   mutate(region_name = as.character(as_factor(v024))) %>%
   mutate(residence = as.character(as_factor(v025))) %>%
