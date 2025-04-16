@@ -29,6 +29,11 @@ source("./src/calculate-direct/compare-statcompiler.R", local = new.env())
 
 source("./src/model/test-model.R", local = new.env())
 
+# add diagnostic plots
+
+# Visualizations ----------------------------------------------------------
+
+
 
 
 
