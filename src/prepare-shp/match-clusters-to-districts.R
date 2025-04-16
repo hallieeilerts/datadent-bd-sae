@@ -5,42 +5,26 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
-library(rgdal)
+library(sf)
 #' Inputs
 source("./src/util.R")
 # Location masked of DHS clusters
-EAPoints <- readOGR(dsn="./data/BD_2022_DHS_03042025_2045_120781/BDGE81FL",layer="BDGE81FL")
+ea <- st_read("./data/BD_2022_DHS_03042025_2045_120781/BDGE81FL", layer = "BDGE81FL")
 # Bangladesh district boundaries
-DP <- readOGR(dsn="./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
+bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
 ################################################################################
 
-proj4string(EAPoints)
+# convert to sf object with same CRS as shapefile
+ea_crs <- st_as_sf(ea, coords = c("longitude", "latitude"), crs = st_crs(bangladesh_2))
 
-# Make Projections consistent
-EAPoints <- spTransform(EAPoints, CRS("+proj=utm +zone=36 +datum=WGS84"))
-DP <- spTransform(DP, CRS("+proj=utm +zone=36 +datum=WGS84"))
+# join each point to the district polygon it falls within
+points_with_district <- st_join(ea_crs, bangladesh_2)
 
-# Number of clusters/EAs
-nEA <- dim(EAPoints)[[1]]
+df <- data.frame(DHSCLUSTER = as.numeric(as.character(points_with_district$DHSCLUST)),
+                 ADM2_EN = as.character(points_with_district$ADM2_EN))
 
-#Determining Polygon of Observed Point
-#for(i in 1:nEA) {
-ov_point <- as.data.frame(over(EAPoints, DP))
-dim(ov_point)
-ov_point
-given_dis <- as.character(ov_point$ADM2_EN)
-given_dis
+# Save --------------------------------------------------------------------
 
-head(EAPoints)
-EAOut <- as.data.frame(EAPoints)
-EAOut$Mapped_district <- given_dis
-as.character(EAOut$Mapped_district)
-
-EAOut <- EAOut[,c("DHSCLUST","Mapped_district")]
-temp <- data.frame(  DHSCLUSTER = as.numeric(as.character(EAOut$DHSCLUST)),
-                     district = as.character(EAOut$Mapped_district))
-
-#write.csv(temp, "./gen/BDGE81FL_C.csv", row.names = FALSE)
-write.csv(temp, "./gen/prepare-shp/output/cluster-districts.csv", row.names = FALSE)
+write.csv(df, "./gen/prepare-shp/output/cluster-locations.csv", row.names = FALSE)
 
 

@@ -1,6 +1,6 @@
 
 
-# Helper functions --------------------------------------------------------
+# DHS helper functions --------------------------------------------------------
 
 # Configuration of covariate constants
 # Note: scale is output scale
@@ -117,6 +117,42 @@ read_dhs <- function(dhs_indicator_code) {
 
 
 
+
+# Spatial helper functions ------------------------------------------------
+
+nb2mat_to_nodes <- function(adj_mat) {
+  N_A <- nrow(adj_mat)
+  N_edges <- sum(adj_mat != 0) / 2
+  n1 <- vector(mode="numeric", length = N_edges)
+  n2 <- vector(mode="numeric", length = N_edges)
+  k <- 1
+  for (i in 1:N_A) {
+    for (j in i:N_A) {
+      if (adj_mat[i, j] != 0) {
+        n1[k] <- i
+        n2[k] <- j
+        k <- k + 1
+      }
+    }
+  }
+  return(list(n1 = n1, n2 = n2))
+}
+
+prepare_bym2 <- function(adj_mat) {
+  nodes <- nb2mat_to_nodes(adj_mat)
+  inla_adj <- sparseMatrix(i = nodes$n1, j = nodes$n2,
+                           x = 1, symmetric = T)
+  # ICAR precision matrix
+  Q <- Diagonal(nrow(adj_mat), Matrix::rowSums(inla_adj)) - inla_adj
+  Q_jit = Q + Diagonal(nrow(adj_mat)) * max(diag(Q)) * sqrt(.Machine$double.eps)
+  
+  Q_inv = inla.qinv(Q_jit, constr=list(A = matrix(1, 1, nrow(adj_mat)), e=0))
+  
+  #Compute the geometric mean of the variances, which are on the diagonal of Q.inv
+  scl = exp(mean(log(diag(Q_inv))))
+  return(list(n1 = nodes$n1, n2 = nodes$n2, scaling_factor = scl))
+}
+
 # Data prep ---------------------------------------------------------------
 
 fn_prepKR <- function(x){
@@ -183,8 +219,8 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   x$nt_ch_micro_vas <- 0
   x$nt_ch_micro_vas[(x$age_months >=6 & x$age_months <= 59) & (x$h34 ==1 | x$mdyc <= 6)] <- 1
   x$nt_ch_micro_vas[!(x$age_months >=6 & x$age_months <= 59) | x$b5 == 0 ] <- NA
-  x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 0] <- "No"
-  x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 1] <- "Yes"
+  x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 0] <- 0
+  x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 1] <- 1
   
   #x$var <- x$nt_ch_micro_vas
   #x <- subset(x, !is.na(var))
@@ -200,8 +236,8 @@ fn_gen_nt_ch_micro_dwm	<- function(x){
   x$nt_ch_micro_dwm <- 0
   x$nt_ch_micro_dwm[(x$h43 == 1)] <- 1
   x$nt_ch_micro_dwm[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
-  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 0] <- "No"
-  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 1] <- "Yes"
+  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 0] <- 0
+  x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 1] <- 1
 
   #x$var <- x$nt_ch_micro_dwm
   #x <- subset(x, !is.na(var))
@@ -227,7 +263,7 @@ fn_gen_ch_rotav3_either	<- function(x){
     mutate(rotav2 = case_when(h58 %in% c(1,2,3) ~ 1, h58%in%c(0,8) ~ 0  )) %>%
     mutate(rotav3 = case_when(h59 %in% c(1,2,3) ~ 1, h59%in%c(0,8) ~ 0  )) %>%
     mutate(rotavsum= rotav1+rotav2+rotav3) %>%
-    mutate(ch_rotav3_either = case_when(rotavsum >=3 ~ "Yes", TRUE ~ "No" )) %>%
+    mutate(ch_rotav3_either = case_when(rotavsum >=3 ~ 1, TRUE ~ 0 )) %>%
     mutate(ch_rotav3_either = ifelse(vacage == 0, NA, ch_rotav3_either))
     
     return(x)
@@ -244,7 +280,7 @@ fn_gen_ch_meas_either	<- function(x){
                age_months >=24 & age_months <=35 ~ 2)) %>%
     mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
     mutate(ch_meas_either = 
-           case_when(h9 %in% c(1,2,3) ~ "Yes", h9 %in% c(0,8) ~ "No")) %>%
+           case_when(h9 %in% c(1,2,3) ~ 1, h9 %in% c(0,8) ~ 0)) %>%
     mutate(ch_meas_either = ifelse(vacage == 0, NA, ch_meas_either))
   
   return(x)
@@ -272,8 +308,8 @@ fn_gen_nt_ebf <- function(x){
     mutate(nt_bf_status = case_when(nt_bf_curr==0 ~ 0, solids==1 ~ 5, milk==1 ~ 4, liquids==1 ~3, water==1 ~2, TRUE~1 )) %>%
     mutate(nt_ebf =
              case_when(
-               age<6 & nt_bf_status==1  ~ "Yes" ,
-               age<6 & nt_bf_status!=1 ~ "No")) 
+               age<6 & nt_bf_status==1  ~ 1 ,
+               age<6 & nt_bf_status!=1 ~ 0)) 
   
   return(x)
 }
@@ -286,8 +322,8 @@ fn_gen_nt_counsel_iycf	<- function(x){
   x$nt_counsel_iycf <- 0
   x$nt_counsel_iycf[(x$v486 == 1)] <- 1
   x$nt_counsel_iycf[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
-  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 0] <- "No"
-  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 1] <- "Yes"
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 0] <- 0
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 1] <- 1
   
   return(x)
   
@@ -302,14 +338,14 @@ fn_gen_nt_wm_micro_iron <- function(x){
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_WM_NUT.R
   x$nt_wm_micro_iron <- NA
   x$nt_wm_micro_iron[x$v208 == 0] <- NA
-  x$nt_wm_micro_iron[x$v45_1 == 0] <- 0
+  x$nt_wm_micro_iron[x$m45_1 == 0] <- 0
   x$nt_wm_micro_iron[x$m46_1 < 60] <- 1
   x$nt_wm_micro_iron[x$m46_1 >= 60 & x$m46_1 < 90] <- 2
-  x$nt_wm_micro_iron[x$m46_1 >= 90 & x$m46_1 < 300] <- 3
+  x$nt_wm_micro_iron[x$m46_1 >= 90 & x$m46_1 <= 300] <- 3
   x$nt_wm_micro_iron[x$m46_1 >= 998 | x$m45_1 >= 8] <- NA
   
-  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron >= 3] <- "Yes" # 90+ days
-  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron < 3] <-  "No"  # <90 days
+  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron < 3] <-  0  # <90 days
+  x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron >= 3] <- 1 # 90+ days
    
   #set_value_labels(nt_wm_micro_iron = c("None"=0, "<60"=1, "60-89"=2, "90+"=3, "Don't know/missing"=4))
   
@@ -334,8 +370,8 @@ fn_gen_rh_anc_4vs <- function(x){
     replace_with_na(replace = list(rh_anc_numvs = c(99))) %>%
     mutate(rh_anc_4vs =
              case_when(
-               rh_anc_numvs==3 ~ "Yes",
-               rh_anc_numvs %in% c(0,1,2,9) ~ "No" ))
+               rh_anc_numvs==3 ~ 1,
+               rh_anc_numvs %in% c(0,1,2,9) ~ 0 ))
   
   return(x)
 }
@@ -357,8 +393,8 @@ fn_gen_rh_anc_1tri	<- function(x){
     replace_with_na(replace = list(rh_anc_moprg = c(99))) %>%
     mutate(rh_anc_1tri = 
              case_when(
-               rh_anc_moprg == 1 ~ "Yes",
-               rh_anc_moprg %in% c(0,2,3,4,9) ~ "No" )
+               rh_anc_moprg == 1 ~ 1,
+               rh_anc_moprg %in% c(0,2,3,4,9) ~ 0)
              )
   return(x)
 }

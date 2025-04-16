@@ -1,6 +1,6 @@
 ################################################################################
 #' @description Combine variables for child-level model
-#' @return 
+#' @return csv with child-level outcomes and covariates
 ################################################################################
 #' Clear environment
 rm(list = ls())
@@ -12,20 +12,16 @@ ir <- readRDS("./gen/prepare-dhs/temp/variables-ir.rds")
 hr <- readRDS("./gen/prepare-dhs/temp/variables-hr.rds")
 ################################################################################
 
-# only keep identifiers and covariates from mother file
+# only keep identifiers and covariates from mother and household files
 mother_covar <- ir %>%
   select(v001, v002, mother_ln, mother_edu)
+hhd_covar <- hr %>%
+  select(hv001, hv002, hhd_mem, hhd_under5, hhd_head_sex, hhd_head_age, wealth_index)
 
-# merge child outcomes (and covariates) to mother covariates
+# merge
 dat <- kr %>%
-  left_join(mother_covar, by = c("v001", "v002", "mother_ln")) 
-
-
-# !!!NOTE: need to remove wt and district from hr file!!!
-
-# merge to household covariates
-dat <- dat %>%
-  left_join(hr, by = c("v001" = "hv001", "v002" = "hv002"))
+  left_join(mother_covar, by = c("v001", "v002", "mother_ln")) %>%
+  left_join(hhd_covar, by = c("v001" = "hv001", "v002" = "hv002"))
 
 # Save --------------------------------------------------------------------
 

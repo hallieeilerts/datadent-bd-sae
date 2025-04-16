@@ -1,30 +1,68 @@
 ################################################################################
 #' @description Calculate direct estimates of mother-level outcomes
-#' @return 
+#' @return Data frame with naive, weighted direct estimates, variance, degrees of freedom
 ################################################################################
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(tidyr)
 library(survey)
 #' Inputs
 source("./src/util.R")
-dat <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
+dhs <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
 ################################################################################
 
-dat_iron <- fn_var_taylor(dat, "nt_wm_micro_iron")
-dat_iron$dhs_indicator_code <- NA
-# NA because i changed it to a binary indicator for <90 days or 90+ days
+# CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
-dat_anc4 <- fn_var_taylor(dat, "rh_anc_4vs")
-dat_anc4$dhs_indicator_code <- "RH_ANCN_W_N4P"
+naive <- dhs %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_wm_micro_iron = mean(nt_wm_micro_iron, na.rm = TRUE),
+            rh_anc_4vs = mean(rh_anc_4vs, na.rm = TRUE),
+            rh_anc_1tri = mean(rh_anc_1tri, na.rm = TRUE)) %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
-dat_anc1tri <- fn_var_taylor(dat, "rh_anc_1tri")
-dat_anc1tri$dhs_indicator_code <- NA
+naive_var <- dhs %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_wm_micro_iron = var(nt_wm_micro_iron, na.rm = TRUE),
+            rh_anc_4vs = var(rh_anc_4vs, na.rm = TRUE),
+            rh_anc_1tri = var(rh_anc_1tri, na.rm = TRUE)) %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
-# rbind results if multiple
-res <- rbind(dat_iron, dat_anc4, dat_anc1tri)
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
+
+dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
+                                    strata = "region_name", # division
+                                    weights = "wt",
+                                    nest = TRUE)
+dir <- dhs_svy %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),
+            rh_anc_4vs = survey_mean(rh_anc_4vs, na.rm = TRUE, vartype = "var"),
+            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var")) 
+v_var <- names(dir)[grepl("_var", names(dir))]
+v_dir <- names(dir)[!grepl("_var", names(dir))]
+dir_var <- dir[,c("ADM2_EN", v_var)]
+names(dir_var) <- gsub("_var", "", names(dir_var))
+dir <- dir[,v_dir]
+dir <- dir %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
+dir_var <- dir_var %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
+
+# calculate degrees of freedom
+dhs_degf <- dhs %>%
+  group_by(ADM2_EN) %>%
+  summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
+            degf = n_obs - 1)
+
+# MERGE
+
+est_adm2 <- naive %>%
+  left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(dir, by = c("ADM2_EN", "variable")) %>%
+  left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(dhs_degf, by = c("ADM2_EN"))
 
 # Save --------------------------------------------------------------------
 
-write.csv(res, file = "./gen/calculate-direct/temp/direct-mother.csv", row.names = FALSE)
-
+write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-mother.csv", row.names = FALSE)

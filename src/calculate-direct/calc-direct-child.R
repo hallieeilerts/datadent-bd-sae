@@ -1,37 +1,69 @@
 ################################################################################
 #' @description Calculate direct estimates of child-level outcomes
-#' @return 
+#' @return Data frame with naive, weighted direct estimates, variance, degrees of freedom
 ################################################################################
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(tidyr)
 library(survey)
 #' Inputs
 source("./src/util.R")
-dat <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
+dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
 ################################################################################
 
-dat_vas <- fn_var_taylor(dat, "nt_ch_micro_vas")
-dat_vas$dhs_indicator_code <- "CN_MIAC_C_VAS"
+# CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
-dat_dwm <- fn_var_taylor(dat, "nt_ch_micro_dwm")
-dat_dwm$dhs_indicator_code <- "CN_MIAC_C_DWM"
+naive <- dhs %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_ch_micro_vas = mean(nt_ch_micro_vas, na.rm = TRUE),
+            nt_ch_micro_dwm = mean(nt_ch_micro_dwm, na.rm = TRUE),
+            nt_ebf = mean(nt_ebf, na.rm = TRUE)) %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
-#dat_iycc_cou <- fn_var_taylor(dat, "nt_counsel_iycf")
-#dat_iycc_cou$dhs_indicator_code <- "CN_IYCC_W_COU"
+naive_var <- dhs %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_ch_micro_vas = var(nt_ch_micro_vas, na.rm = TRUE),
+            nt_ch_micro_dwm = var(nt_ch_micro_dwm, na.rm = TRUE),
+            nt_ebf = var(nt_ebf, na.rm = TRUE)) %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
-#dat_rota3 <- fn_var_taylor(dat, "ch_rotav3_either")
-#dat_rota3$dhs_indicator_code <- "CH_VACC_C_RT2"
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
 
-#dat_meas <- fn_var_taylor(dat, "ch_meas_either")
-#dat_meas$dhs_indicator_code <- "CH_VACC_C_MSL"
+dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
+                                    strata = "region_name", # division
+                                    weights = "wt",
+                                    nest = TRUE)
+dir <- dhs_svy %>% 
+  group_by(ADM2_EN) %>% 
+  summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
+            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var")) 
+v_var <- names(dir)[grepl("_var", names(dir))]
+v_dir <- names(dir)[!grepl("_var", names(dir))]
+dir_var <- dir[,c("ADM2_EN", v_var)]
+names(dir_var) <- gsub("_var", "", names(dir_var))
+dir <- dir[,v_dir]
+dir <- dir %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
+dir_var <- dir_var %>%
+  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
 
-dat_ebf <- fn_var_taylor(dat, "nt_ebf")
-dat_ebf$dhs_indicator_code <- "CN_BFSS_C_EBF"
+# calculate degrees of freedom
+dhs_degf <- dhs %>%
+  group_by(ADM2_EN) %>%
+  summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
+            degf = n_obs - 1)
 
-res <- rbind(dat_vas, dat_dwm, dat_ebf)
+# MERGE
 
+est_adm2 <- naive %>%
+  left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(dir, by = c("ADM2_EN", "variable")) %>%
+  left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(dhs_degf, by = c("ADM2_EN"))
+  
 # Save --------------------------------------------------------------------
 
-write.csv(res, file = "./gen/calculate-direct/temp/direct-child.csv", row.names = FALSE)
+write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-child.csv", row.names = FALSE)
 
