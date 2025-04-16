@@ -22,6 +22,8 @@ source("./src/prepare-dhs/create-input-mother.R", local = new.env())
 source("./src/calculate-direct/calc-direct-child.R", local = new.env())
 source("./src/calculate-direct/calc-direct-mother.R", local = new.env())
 source("./src/calculate-direct/combine-direct.R", local = new.env())
+source("./src/calculate-direct/download-statcompiler.R", local = new.env())
+source("./src/calculate-direct/compare-statcompiler.R", local = new.env())
 
 # Modeling ----------------------------------------------------------------
 

@@ -13,6 +13,16 @@ source("./src/util.R")
 dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
 ################################################################################
 
+# SET DHS INDICATOR CODES
+
+dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM", "CN_BFSS_C_EBF"),
+                        variable = c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf"))
+
+# Not in survey
+# nt_counsel_iycf CN_IYCC_W_COU
+# ch_rotav3_either CH_VACC_C_RT2
+# ch_meas_either CH_VACC_C_MSL
+
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
 naive <- dhs %>% 
@@ -58,40 +68,44 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
+  summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
             degf = n_obs - 1)
 
 # MERGE
 
-est_adm2 <- naive %>%
+est_adm2 <- dhs_codes %>%
+  left_join(naive, by = c("variable")) %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dir, by = c("ADM2_EN", "variable")) %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
+
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM0 LEVEL FOR AUDIT
+
+dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
+                                    strata = "v023", # strata for sampling
+                                    weights = "wt",
+                                    nest = TRUE)
+
+dir <- dhs_svy %>% 
+  summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
+            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var")) 
+v_var <- names(dir)[grepl("_var", names(dir))]
+v_dir <- names(dir)[!grepl("_var", names(dir))]
+dir_var <- dir[, v_var]
+names(dir_var) <- gsub("_var", "", names(dir_var))
+dir <- dir[, v_dir]
+dir <- dir %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "dir")
+dir_var <- dir_var %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "dir_var")
   
-
-
-# x_modified <- subset(dhs, !is.na(nt_ch_micro_vas))
-# survey_design <- svydesign(
-#   id = ~v001,       # Primary Sampling Unit (PSU)
-#   strata = ~v023,   # Stratification variable
-#   weights = ~wt,    # Survey weights
-#   data = x_modified,
-#   nest = TRUE       # Accounts for stratification
-# )
-# taylor_results <- svyby(
-#   formula = ~nt_ch_micro_vas,  # variable of interest
-#   by = ~ADM2_EN,  # grouping
-#   design = survey_design,
-#   FUN = svymean,               # Compute mean (proportion)
-#   vartype = "se"               # Get standard error (SE)
-# ) %>%
-#   mutate(variance = as.numeric(se)^2) %>%
-#   rename(value = nt_ch_micro_vas)
-# taylor_results 
-
+est_adm0 <- dhs_codes %>%
+  left_join(dir, by = c("variable")) %>%
+  left_join(dir_var, by = c("variable"))
 
 # Save --------------------------------------------------------------------
 
 write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-child.csv", row.names = FALSE)
-
+write.csv(est_adm0, file = "./gen/calculate-direct/temp/direct-child-adm0.csv", row.names = FALSE)
