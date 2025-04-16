@@ -1,0 +1,5 @@
+"survey_id","dhs_indicator_code","dhs_indicator_description","value","ByVariableLabel"
+"BD2022DHS","CN_BFSS_C_EBF","Children exclusively breastfeeding",53.3,NA
+"BD2022DHS","CN_MIAC_C_VAS","Children consuming vitamin A supplements",70.5,NA
+"BD2022DHS","RH_ANCN_W_N4P","Antenatal visits for pregnancy: 4+ visits",39.6,"Three years preceding the survey"
+"BD2022DHS","RH_ANCN_W_N4P","Antenatal visits for pregnancy: 4+ visits",40.5,"Two years preceding the survey"
