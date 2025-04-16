@@ -27,13 +27,16 @@ source("./src/calculate-direct/compare-statcompiler.R", local = new.env())
 
 # Modeling ----------------------------------------------------------------
 
-source("./src/model/test-model.R", local = new.env())
+#source("./src/model/test-model.R", local = new.env())
+source("./src/model/fit-model.R", local = new.env())
 
-# add diagnostic plots
+# save diagnostic plots?
 
 # Visualizations ----------------------------------------------------------
 
-
+source("./src/visualizations/facet-maps.R", local = new.env())
+source("./src/visualizations/tmap.R", local = new.env())
+source("./src/visualizations/uncert-int.R", local = new.env())
 
 
 

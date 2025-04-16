@@ -37,6 +37,8 @@ ind_dist <- bangladesh_2 %>%
 
 ### removing all LGAs with only one EA 
 ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
+
+# Load model file
 stanfile <- here('src/model/',paste0('areal_level_',model_name,'.stan')) # For Binomial model, "areal_level_binom_BYM2.stan"
 mod <- cmdstan_model(stanfile)
 data_list <- list(
@@ -64,6 +66,10 @@ fit <- mod$sample(
   parallel_chains = 2,
   refresh = 50 # print update every 50 iters
 )
+
+# save.image(file = paste0("./gen/model/output/test.RData"))
+# temp_rds_file <- tempfile(fileext = ".RDS")
+
 
 post_samples = fit$draws(format = "df",  inc_warmup = F)
 post_samples$chain = as.character(post_samples$.chain)
@@ -107,17 +113,12 @@ for (param in colnames(df_v)[1:10]){
 
 
 ind_dist$post_mean <- df_p[,1:nrow(ind_dist)] |> colMeans() |> unname()
-ind_dist$post_var <-  sapply(df_p[,1:nrow(ind_dist)],var) |> unname()
+ind_dist$post_var <-  sapply(df_p[,1:nrow(ind_dist)], var) |> unname()
 
 ind_dist$naive <- ind_dist$naive * 100
 ind_dist$dir <- ind_dist$dir * 100
 ind_dist$post_mean <- ind_dist$post_mean * 100
 
-# what if i get uncertainty intervals from posterior distribution and not using predicted variance?
-ind_dist$post_lb <- df_p[, 1:nrow(ind_dist)] |> apply(2, quantile, probs = 0.025) |>  unname()
-ind_dist$post_ub <- df_p[, 1:nrow(ind_dist)] |> apply(2, quantile, probs = 0.975) |>  unname()
-ind_dist$post_lb <- ind_dist$post_lb * 100
-ind_dist$post_ub <- ind_dist$post_ub * 100
 
 # plot prevalence ---------------------------------------------------------
 
@@ -251,23 +252,12 @@ ci <- data.frame(district = ind_dist$ADM2_EN,
                  pred_var = ind_dist$post_var)
 ci$dir_se <- sqrt(ci$dir_var) * 100
 ci$pred_se <- sqrt(ci$pred_var) * 100
-
-ci_long <- ci %>%
+ci %>%
   pivot_longer(
     cols = c(dir,pred),
   ) %>%
   mutate(lb = ifelse(name == "dir", value - 1.96*dir_se, value - 1.96*pred_se),
-         ub = ifelse(name == "dir", value + 1.96*dir_se, value + 1.96*pred_se))
-
-# add uncertainty intervals from posterior distribution (not predicted variance)
-add_pred <- data.frame(name = "pred-quant",
-           district = ind_dist$ADM2_EN,
-           value = ind_dist$post_mean,
-           lb = ind_dist$post_lb,
-           ub = ind_dist$post_ub)
-ci_long <- bind_rows(ci_long, add_pred)
-
-ci_long %>%
+         ub = ifelse(name == "dir", value + 1.96*dir_se, value + 1.96*pred_se)) %>%
   ggplot(aes(x = district, y = value, color = name, group = name)) +
   geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.8), width = 0.2) +
   geom_point(position = position_dodge(width = 0.8)) +
