@@ -285,6 +285,7 @@ fn_gen_rh_anc_4vs <- function(x){
 }
 
 # //Number of months pregnant at time of first ANC visit
+# //First ANC visit during first trimester
 fn_gen_rh_anc_1tri	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
