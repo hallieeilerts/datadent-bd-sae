@@ -19,7 +19,8 @@ if (!isTRUE(requireNamespace("INLA", quietly = TRUE))) {
 #' Inputs
 source("./src/util.R")
 # Data
-dhs <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
+#dhs <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
+dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
 # Direct estimates and variance
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 # Bangladesh district boundaries
@@ -31,7 +32,7 @@ prep <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
 # https://richardli.github.io/SUMMER/articles/web_only/small-area-estimation.html
 
 unique(est$variable)
-outcome <- "nt_wm_micro_iron"
+outcome <- "nt_ch_micro_dwm"
 
 # direct estimates
 
@@ -59,16 +60,17 @@ results <- data.frame(domain = direct$ADM2_EN,
 
 # we fit two versions of the spatial area levelmodel in SUMMER
 
-summer.brfss <- smoothArea(nt_wm_micro_iron~1, domain= ~ADM2_EN,
+summer.brfss <- smoothArea(nt_ch_micro_dwm~1, domain= ~ADM2_EN,
                            design = design,
                            transform = "logit",
                            adj.mat = mat, level = 0.95)
-summer.brfss.alt <- smoothArea(nt_wm_micro_iron~1, domain= ~ADM2_EN,
+summer.brfss.alt <- smoothArea(nt_ch_micro_dwm~1, domain= ~ADM2_EN,
                                design = design,
                                transform = "logit",
                                adj.mat = mat, level = 0.95,
                                pc.u = 0.1, pc.alpha = 0.01)
 
+# create map plots
 toplot <-  summer.brfss$bym2.model.est
 toplot$logit.var <- toplot$var / 
   (summer.brfss$bym2.model.est$median ^ 2 * 
@@ -83,18 +85,18 @@ variables <- c("median", "median.alt",  "median.sae",
                "logit.var", "logit.var.alt", "mse.sae")
 names <- c("Median (default prior)", "Median (new prior)",  "EBLUP (sae)",
            "Variance (default prior)", "Variance (new prior)", "MSE (sae)")
-mapPlot(data = toplot, geo = bangladesh_2,
-        variables=variables[1:3], 
-        labels = names[1:3], by.data = "domain",
-        by.geo = "ADM2_EN", size = 0.1) 
-mapPlot(data = toplot, geo = bangladesh_2,
-        variables=variables[4:6], labels = names[4:6],
-        by.data = "domain", by.geo = "ADM2_EN", size = 0.1) 
+# mapPlot(data = toplot, geo = bangladesh_2,
+#         variables=variables[1:3], 
+#         labels = names[1:3], by.data = "domain",
+#         by.geo = "ADM2_EN", size = 0.1) 
+# mapPlot(data = toplot, geo = bangladesh_2,
+#         variables=variables[4:6], labels = names[4:6],
+#         by.data = "domain", by.geo = "ADM2_EN", size = 0.1) 
 
 
 df_plot <- rbind(summer.brfss$direct.est,
-      summer.brfss$bym2.model.est)
-df_plot %>%
+                 summer.brfss$bym2.model.est)
+p <- df_plot %>%
   ggplot(aes(x = domain, y = mean, color = method, group = method)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = 0.8), width = 0.2) +
   geom_point(position = position_dodge(width = 0.8)) +
@@ -104,3 +106,4 @@ df_plot %>%
   labs(title = outcome) +
   theme(text = element_text(size = 10), legend.title=element_blank()) +
   scale_color_discrete(guide = guide_legend(reverse = TRUE)) 
+ggsave(paste0("./gen/visualizations/uncert-int/", outcome,"-summer.png"), p, width = 8, height = 15, limitsize = F)
