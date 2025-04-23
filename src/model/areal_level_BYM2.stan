@@ -27,6 +27,7 @@ data{
     array[N_edges] int<lower=1, upper=N> node1 ;
     array[N_edges] int<lower=1, upper=N> node2 ;
     real<lower=0> scaling_factor; 
+    
 }
 transformed data {
     real delta = 1e-9;

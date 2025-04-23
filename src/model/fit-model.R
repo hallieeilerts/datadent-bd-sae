@@ -30,14 +30,16 @@ test <- "Test2"
 model_name <- "areal_level_BYM2.stan"
 
 # set parameters
+#burnin <- 1000
+#niter <- 10000
 burnin <- 1000
-niter <- 10000
+niter <- 1000
 nchains <- 2
 
-# Give adm2_index
+# create adm2_index
 bangladesh_2 <- bangladesh_2[order(bangladesh_2$ADM2_EN),]
 bangladesh_2$district_id <- 1:nrow(bangladesh_2)
-# Set model path
+# set model path
 stanfile <- here(paste0("src/model/", model_name))
 # vector of outcomes
 v_var <- unique(est$variable)
@@ -46,13 +48,14 @@ modinfo <- data.frame()
 
 for(i in 1:length(v_var)){
   
+  i <- 1
   outcome <- v_var[i]
   
   # subset indicator
   ind_dat <- subset(est, variable == outcome)
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
   
-  # Join spatial data
+  # join spatial data
   ind_dist <- bangladesh_2 %>% 
     left_join(ind_dat, by = "ADM2_EN") %>%
     arrange(ADM2_EN)
@@ -64,6 +67,9 @@ for(i in 1:length(v_var)){
   # Compile model
   mod <- cmdstan_model(stanfile)
   data_list <- list(
+    # adding FE
+    #D = 
+    #X = df[,c(“cov1”,”cov2”)]
     N = nrow(ind_dist),
     NS = nrow(ind_dist_complete),
     adm2_index = ind_dist_complete$district_id,
@@ -111,6 +117,8 @@ for(i in 1:length(v_var)){
     gsub("\\]", "", .) %>%
     gsub(",","_", .)
   
+  # extract FE
+  # variables= ('beta')
   df_p = fit$draws(format = "df", variables=c('p'),  inc_warmup = F) |> mutate(chain=as.character(.chain)) 
   df_v = fit$draws(format = "df", variables=c('v'),  inc_warmup = F) |> mutate(chain=as.character(.chain))
   colnames(df_p) <- colnames(df_p) %>%
@@ -125,24 +133,24 @@ for(i in 1:length(v_var)){
   # for (param in colnames(post_samples)[2:10]){
   #   dat = post_samples#[post_samples$chain==2,]
   #   gg = ggplot(data=dat, aes_string(x=".iteration", y = param, color="chain"))+
-  #     geom_line() + theme_minimal() 
+  #     geom_line() + theme_minimal()
   #   print(gg)
   # }
   # 
   # for (param in colnames(df_p)[1:10]){
   #   dat = df_p
   #   gg = ggplot(data=dat, aes_string(x=".iteration", y = param, color="chain"))+
-  #     geom_line() + theme_minimal() 
+  #     geom_line() + theme_minimal()
   #   print(gg)
   # }
   # 
   # for (param in colnames(df_v)[1:10]){
   #   dat = df_v
   #   gg = ggplot(data=dat, aes_string(x=".iteration", y = param, color="chain"))+
-  #     geom_line() + theme_minimal() 
+  #     geom_line() + theme_minimal()
   #   print(gg)
   # }
-  # 
+
   
   postpred <- ind_dat
   postpred$post_mean <- df_p[,1:nrow(postpred)] |> colMeans() |> unname()
@@ -157,7 +165,7 @@ for(i in 1:length(v_var)){
   
 }
 
-# if onld model info has the same file name as in new, drop
+# if old model info has the same file name as in new, drop
 old_modinfo <- subset(old_modinfo, !(file %in% modinfo$file))
 new_modinfo <- rbind(modinfo, old_modinfo)
 new_modinfo <- new_modinfo[order(new_modinfo$file)]
