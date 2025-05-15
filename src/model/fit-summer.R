@@ -8,6 +8,7 @@ rm(list = ls())
 library(sae)
 library(SUMMER)
 library(survey)
+library(srvyr)
 library(dplyr)
 library(tidyr)
 library(sf)
@@ -96,6 +97,8 @@ names <- c("Median (default prior)", "Median (new prior)",  "EBLUP (sae)",
 
 df_plot <- rbind(summer.brfss$direct.est,
                  summer.brfss$bym2.model.est)
+df_plot$method[df_plot$method == "Direct"] <- "1 - direct"
+df_plot$method[df_plot$method == "Area level model: BYM2"] <- "2 - area level model: BYM2" 
 p <- df_plot %>%
   ggplot(aes(x = domain, y = mean, color = method, group = method)) +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = 0.8), width = 0.2) +
