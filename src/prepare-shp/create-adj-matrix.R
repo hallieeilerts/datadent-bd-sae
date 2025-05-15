@@ -22,7 +22,7 @@ nb <- poly2nb(geo, queen = TRUE)
 
 # plot districts with neighbor links
 png("./gen/prepare-shp/audit/neighbors.png", width = 800, height = 800)
-plot(geo, border = "gray")
+plot(geo, border = "black")
 plot(nb, coordinates(geo), add = TRUE, col = "red", lwd = 1)
 dev.off()
 

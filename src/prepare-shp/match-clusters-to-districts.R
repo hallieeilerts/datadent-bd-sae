@@ -21,7 +21,8 @@ ea_crs <- st_as_sf(ea, coords = c("longitude", "latitude"), crs = st_crs(banglad
 points_with_district <- st_join(ea_crs, bangladesh_2)
 
 df <- data.frame(DHSCLUSTER = as.numeric(as.character(points_with_district$DHSCLUST)),
-                 ADM2_EN = as.character(points_with_district$ADM2_EN))
+                 ADM2_EN = as.character(points_with_district$ADM2_EN),
+                 ADM1_EN = as.character(points_with_district$ADM1_EN))
 
 # Save --------------------------------------------------------------------
 
