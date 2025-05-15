@@ -33,11 +33,13 @@ if(sum(grepl("model-info", audit_files)) > 0){
 ################################################################################
 
 # set model
-vers <- "006"
-test <- "Test1"
+vers <- "051"
+test <- "Test2"
 model_name <- "ArealBYM2"
 model_file <- "areal_level_BYM2_FE.stan"
-v_cov <- "hhd_under5"
+v_cov <- c("wealth_index", "hhd_under5", "hhd_head_age", "hhd_head_sex", "mother_age", "child_age")
+# not using: mother_edu (likely colinear with wealth_index), FCS (can't find), residence (not a lot of heterogeneity by district)
+# add Child Dietary Diversity if possible for child-level outcomes
 
 # generate plots?
 make_plots <- FALSE
@@ -64,6 +66,16 @@ for(i in 1:length(v_var)){
   outcome <- v_var[i]
   file_name <- paste(model_name, outcome, vers, test, sep = "-")
   
+  # adjust age covariate for mother vs child outcome
+  # if mother, drop child age. if child, drop mother age.
+  if(outcome %in% c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri")){
+    v_cov_mod <- v_cov[!(v_cov %in% "child_age")]
+  }
+  if(outcome %in% c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf" )){
+    v_cov_mod <- v_cov[!(v_cov %in% "mother_age")]
+  }
+  
+  
   # subset indicator
   ind_dat <- subset(dat, variable == outcome)
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
@@ -81,9 +93,9 @@ for(i in 1:length(v_var)){
   }
   
   # model matrix for covariates
-  fmla <- as.formula(paste("~", paste(v_cov, collapse = " + ")))
+  fmla <- as.formula(paste("~", paste(v_cov_mod, collapse = " + ")))
   X <- model.matrix(fmla, data = ind_dist_complete) # automatically includes intercept
-  D <- length(v_cov) + 1# number of covar plus 1 for intercept
+  D <- length(v_cov_mod) + 1# number of covar plus 1 for intercept
   
   # Compile model
   mod <- cmdstan_model(stanfile)
@@ -129,7 +141,7 @@ for(i in 1:length(v_var)){
                          vers = vers,
                          test = test,
                          outcome = outcome,
-                         cov = paste(v_cov, collapse = ","),
+                         cov = paste(v_cov_mod, collapse = ","),
                          chains = nchains,
                          iter = niter,
                          burnin = burnin,
