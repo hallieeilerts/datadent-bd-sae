@@ -28,16 +28,18 @@ dat_var <- fn_gen_nt_ch_micro_dwm(dat_var)
 #dat_var <- fn_gen_ch_meas_either(dat_var)
 #dat_var <- fn_gen_ch_rotav3_either(dat_var)
 dat_var <- fn_gen_nt_ebf(dat_var)
+dat_var <- fn_gen_nt_mdd(dat_var)
 
 dat_var <- dat_var %>%
-  select(ADM2_EN, v001, v002, v003, v023, v024, v025, b16, 
-         nt_ch_micro_vas, nt_ch_micro_dwm, nt_ebf, wt) %>%
-  mutate(region_name = as.character(as_factor(v024))) %>%
-  mutate(residence = as.character(as_factor(v025))) %>%
-  mutate(hhid = paste(v001, v002, sep = "_")) %>%
+  select(ADM2_EN, ADM1_EN, v001, v002, v003, v008, v023, v024, v025, b3, b16, 
+         nt_ch_micro_vas, nt_ch_micro_dwm, nt_ebf, nt_mdd, wt) %>%
+  mutate(region_name = as.character(as_factor(v024)),
+         residence = as.character(as_factor(v025)),
+         hhid = paste(v001, v002, sep = "_"),
+         child_age = (v008 - b3)/12) %>%
   rename(child_ln = b16,
          mother_ln = v003) %>%
-  select(-v024)
+  select(-c(v008, v024, b3))
 
 # Save --------------------------------------------------------------------
 
