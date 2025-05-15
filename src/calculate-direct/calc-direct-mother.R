@@ -68,7 +68,8 @@ dir_var <- dir_var %>%
 dhs_degf <- dhs %>%
   group_by(ADM2_EN) %>%
   summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
-            degf = n_obs - 1)
+            degf = n_obs - 1,
+            sum_wgt = sum(wt))
 
 # MERGE
 
@@ -79,7 +80,34 @@ est_adm2 <- dhs_codes %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
-# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM0 LEVEL FOR AUDIT
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
+
+dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
+                                    strata = "v023", # strata for sampling
+                                    weights = "wt",
+                                    nest = TRUE)
+
+dir <- dhs_svy %>% 
+  group_by(ADM1_EN) %>% 
+  summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),
+            rh_anc_4vs = survey_mean(rh_anc_4vs, na.rm = TRUE, vartype = "var"),
+            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var")) 
+v_var <- names(dir)[grepl("_var", names(dir))]
+v_dir <- names(dir)[!grepl("_var", names(dir))]
+dir_var <- dir[,c("ADM1_EN", v_var)]
+names(dir_var) <- gsub("_var", "", names(dir_var))
+dir <- dir[,v_dir]
+dir <- dir %>%
+  pivot_longer(cols = -ADM1_EN, names_to = "variable", values_to = "dir")
+dir_var <- dir_var %>%
+  pivot_longer(cols = -ADM1_EN, names_to = "variable", values_to = "dir_var")
+
+est_adm1 <- dhs_codes %>%
+  left_join(dir, by = c("variable")) %>%
+  left_join(dir_var, by = c("ADM1_EN", "variable"))
+
+
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM0 LEVEL FOR AUDIT WITH DHS STATCOMPILER
 
 dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
                                     strata = "v023", # strata for sampling
@@ -107,5 +135,5 @@ est_adm0 <- dhs_codes %>%
 # Save --------------------------------------------------------------------
 
 write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-mother.csv", row.names = FALSE)
+write.csv(est_adm1, file = "./gen/calculate-direct/temp/direct-mother-adm1.csv", row.names = FALSE)
 write.csv(est_adm0, file = "./gen/calculate-direct/temp/direct-mother-adm0.csv", row.names = FALSE)
-
