@@ -141,6 +141,7 @@ fn_gen_nt_ch_micro_vas	<- function(x){
 # Children age 6-59 mos given deworming medication
 fn_gen_nt_ch_micro_dwm	<- function(x){
   
+  x$age_months <- x$v008 - x$b3
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
   x$nt_ch_micro_dwm <- 0
   x$nt_ch_micro_dwm[(x$h43 == 1)] <- 1
@@ -199,6 +200,7 @@ fn_gen_ch_meas_either	<- function(x){
 fn_gen_nt_ebf <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_IYCF.R
+  x$age_months <- x$v008 - x$b3
   x <- x %>%
     mutate(nt_bf_curr =
              case_when(
@@ -217,8 +219,8 @@ fn_gen_nt_ebf <- function(x){
     mutate(nt_bf_status = case_when(nt_bf_curr==0 ~ 0, solids==1 ~ 5, milk==1 ~ 4, liquids==1 ~3, water==1 ~2, TRUE~1 )) %>%
     mutate(nt_ebf =
              case_when(
-               age<6 & nt_bf_status==1  ~ 1 ,
-               age<6 & nt_bf_status!=1 ~ 0)) 
+               age_months<6 & nt_bf_status==1  ~ 1 ,
+               age_months<6 & nt_bf_status!=1 ~ 0)) 
   
   return(x)
 }
@@ -228,6 +230,7 @@ fn_gen_nt_ebf <- function(x){
 fn_gen_nt_counsel_iycf	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
+  x$age_months <- x$v008 - x$b3
   x$nt_counsel_iycf <- 0
   x$nt_counsel_iycf[(x$v486 == 1)] <- 1
   x$nt_counsel_iycf[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
@@ -237,6 +240,66 @@ fn_gen_nt_counsel_iycf	<- function(x){
   return(x)
   
 }
+
+# Child with minimum dietary diversity- last-born 6-23 months
+# v414, v411, v410, v412, v413, v000, m4
+fn_gen_nt_mdd	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_IYCF.R
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+    # nt_formula, nt_milk, nt_dairy, nt_grains, nt_root, nt_bbyfood, nt_vita, nt_frtveg, nt_eggs, nt_meatfish, nt_nuts
+    # country specific foods. These can be added to the foods below based on the survey. See example for nt_root & nt_meatfish below
+    mutate(food1  = case_when(v414a==1  ~ 1 , v414a!=1 ~ 0)) %>%
+    mutate(food2  = case_when(v414b==1  ~ 1 , v414a!=1 ~ 0)) %>%
+    mutate(food3  = case_when(v414c==1  ~ 1 , v414a!=1 ~ 0)) %>%
+    mutate(food4  = case_when(v414d==1  ~ 1 , v414a!=1 ~ 0)) %>%
+    mutate(nt_formula  = case_when(v411a==1  ~ 1 , v411a!=1~ 0)) %>% # Given formula
+    mutate(nt_milk  = case_when(v411==1  ~ 1 , v411!=1~ 0)) %>% # Given other milk
+    mutate(nt_liquids= case_when(v410==1 | v412c==1 | v413==1  ~ 1 , v410!=1 | v412c!=1 | v413!=1  ~ 0)) %>% # Given other liquids
+    mutate(nt_bbyfood  = case_when(v412a==1  ~ 1 , v412a!=1~ 0)) %>% # Given fortified baby food
+    mutate(nt_grains  = case_when(v412a==1 | v414e==1 ~ 1 , v412a!=1 | v414e!=1 ~ 0)) %>% # Given grains
+    mutate(nt_vita = case_when(v414i==1 | v414j==1 | v414k==1 ~ 1 , v414i!=1 | v414j!=1 | v414k!=1 ~ 0)) %>% # Given Vit A rich foods
+    mutate(nt_frtveg  = case_when(v414l==1  ~ 1 , v414l!=1~ 0)) %>% # Given other fruits or vegetables
+    mutate(nt_root  = case_when(v414f==1 | food1==1 ~ 1, v414f!=1 ~ 0)) %>% # Given roots or tubers
+    mutate(nt_nuts  = case_when(v414o==1  ~ 1 , v414o!=1~ 0)) %>% # Given nuts or legumes
+    mutate(nt_meatfish  = case_when( (v414h==1 |v414m==1 |v414n==1| food2==1) ~ 1,  
+                                     !(v414h==1 | v414m==1 | v414n==1) ~ 0)) %>% # Given meat, fish, shellfish, or poultry  
+    mutate(nt_eggs  = case_when(v414g==1  ~ 1 , v414g!=1~ 0)) %>% # Given eggs
+    mutate(nt_dairy  = case_when(v414p==1 | v414v==1 ~ 1 , v414p!=1 | v414v!=1 ~ 0)) %>% # Given dairy
+    mutate(nt_solids = case_when( nt_bbyfood==1 | nt_grains==1 | nt_vita==1 | nt_frtveg==1 | nt_root==1 | nt_nuts==1 | nt_meatfish==1 | 
+                                    nt_eggs==1 | nt_dairy==1 | v414s==1 ~ 1 ,
+                                  nt_bbyfood!=1 | nt_grains!=1 | nt_vita!=1 | nt_frtveg!=1 | nt_root!=1 | nt_nuts!=1 | nt_meatfish!=1 | 
+                                    nt_eggs!=1 | nt_dairy!=1 | v414s!=1 ~ 0) ) %>%
+    # 1. breastmilk
+    mutate(group1 = case_when(m4==95  ~ 1 ,  m4!=95 ~ 0)) %>% 
+    #2. infant formula, milk other than breast milk, cheese or yogurt or other milk products
+    mutate(group2 = case_when(nt_formula==1 | nt_milk==1 | nt_dairy==1  ~ 1 , nt_formula!=1 | nt_milk!=1 | nt_dairy!=1 ~ 0)) %>%
+    #3. foods made from grains, roots, tubers, and bananas/plantains, including porridge and fortified baby food from grains
+    mutate(group3  = case_when(nt_grains==1 | nt_root==1 | nt_bbyfood==1 ~ 1 , nt_grains!=1 | nt_root!=1 | nt_bbyfood!=1 ~ 0)) %>%
+    #4. vitamin A-rich fruits and vegetables
+    mutate(group4  = case_when(nt_vita==1  ~ 1 , nt_vita!=1 ~ 0)) %>%
+    #5. other fruits and vegetables
+    mutate(group5  = case_when(nt_frtveg==1 ~ 1 , nt_frtveg!=1~ 0)) %>% 
+    #6. eggs
+    mutate(group6  = case_when(nt_eggs==1 ~ 1 , nt_eggs!=1~ 0)) %>% 
+    #7. meat, poultry, fish, and shellfish (and organ meats)
+    mutate(group7  = case_when(nt_meatfish==1 ~ 1 , nt_meatfish!=1~ 0)) %>% 
+    #8. legumes and nuts
+    mutate(group8  = case_when(nt_nuts==1 ~ 1 , nt_nuts!=1~ 0)) %>% 
+    #add the food groups
+    mutate(foodsum  = group1+group2+group3+group4+group5+group6+group7+group8) %>% 
+    mutate(nt_mdd  = case_when(age_months %in% 6:23 & foodsum<5 ~ 0 , age_months %in% 6:23 & foodsum>=5~ 1))
+    
+    #older surveys are 4 out of 7 food groups so the foodsum would add group2-group8 and the recode the sum for 4+ as yes
+    # set_value_labels(nt_mdd = c("Yes" = 1, "No"=0  )) %>%
+    # set_variable_labels(nt_mdd = "Child with minimum dietary diversity, 5 out of 8 food groups- last-born 6-23 months")
+  
+  return(x)
+  
+}
+
+
 
 # IR variables ------------------------------------------------------------
 
