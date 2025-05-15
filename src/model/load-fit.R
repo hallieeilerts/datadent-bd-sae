@@ -4,13 +4,15 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(forcats)
+library(here)
+library(cmdstanr)
 
 # choose indicator
 # "nt_ch_micro_vas"  "nt_ch_micro_dwm"  "nt_ebf" "nt_wm_micro_iron" "rh_anc_4vs" "rh_anc_1tri" 
 outcome <- "nt_ch_micro_vas"
 
 # choose model
-vers <- "001"
+vers <- "050"
 test <- "Test1"
 model_name <- "ArealBYM2"
 file_name <- paste(model_name, outcome, vers, test, sep = "-")
@@ -51,3 +53,13 @@ quantile(subset(df_sum, param == "u1")$ess_bulk)
 # "sigma_u" "sigma_tau" "gamma0" "gamma1" "gamma2"
 single_param <- "rho"
 subset(df_sum, param == single_param)
+
+# look at fixed effects
+modinfo <- read.csv("./gen/model/audit/model-info.csv")
+shortvers <- substr(vers, 2, 3)
+df_modinfo <- subset(modinfo, vers == shortvers & test == test)
+df_modinfo <- df_modinfo[df_modinfo$outcome == outcome,]
+df_modinfo$cov
+dist_param <- "beta"
+df_sum %>%
+  filter(param == dist_param)
