@@ -19,94 +19,107 @@ if (!isTRUE(requireNamespace("INLA", quietly = TRUE))) {
 }
 #' Inputs
 source("./src/util.R")
-# Data
-#dhs <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
-dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
+# DHS data for survey design
+dhs_mth <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
+dhs_chld <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
 # Direct estimates and variance
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
+# District-level covariates
+covar <- read.csv("./gen/prepare-dhs/output/covar-district.csv")
 # Bangladesh district boundaries
 bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
 # Adjacency matrix
 prep <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
+# Model info
+audit_files <- dir("./gen/model/audit/")
+if(sum(grepl("model-info-summer", audit_files)) > 0){
+  old_modinfo <- read.csv("./gen/model/audit/model-info-summer.csv")
+}else{
+  old_modinfo <- data.frame()
+}
 ################################################################################
 
-# https://richardli.github.io/SUMMER/articles/web_only/small-area-estimation.html
-
-unique(est$variable)
-outcome <- "nt_ch_micro_dwm"
-
-# direct estimates
-
-direct <- subset(est, variable == outcome)
-
-# survey design
-
-design <- dhs %>% as_survey_design(ids = "v001", # psu
-                                   strata = "v023", # strata for sampling
-                                   weights = "wt",
-                                   nest = TRUE)
+# set model
+model_name <- "SummerArealBYM2"
+model_file <- ""
+v_cov <- c("wealth_index", "hhd_under5", "hhd_head_age", "hhd_head_sex", "mother_age", "child_age")
+v_cov <-  v_cov[5]
 
 # adjacency matrix
-
 mat <- getAmat(bangladesh_2, bangladesh_2$ADM2_EN)
+# vector of outcomes
+v_var <- unique(est$variable)
+# empty dataframe for storing model info
+modinfo <- data.frame()
 
-# use sae to smooth the logit-transformed direct estimates.
+for(i in 1:length(v_var)){
 
-direct$logit.diab2 <- SUMMER::logit(direct$dir)
-direct$logit.var <- direct$dir_var / (direct$dir ^ 2 * (1 - direct$dir) ^ 2)
-SFH.brfss <- sae::mseSFH(logit.diab2 ~ 1, logit.var, mat, data = direct)
-results <- data.frame(domain = direct$ADM2_EN,
-                      eblup.SFH = SUMMER::expit(SFH.brfss$est$eblup), 
-                      mse = SFH.brfss$mse)
-
-# we fit two versions of the spatial area levelmodel in SUMMER
-
-summer.brfss <- smoothArea(nt_ch_micro_dwm~1, domain= ~ADM2_EN,
-                           design = design,
-                           transform = "logit",
-                           adj.mat = mat, level = 0.95)
-summer.brfss.alt <- smoothArea(nt_ch_micro_dwm~1, domain= ~ADM2_EN,
+  myoutcome <- v_var[i]
+  print(myoutcome)
+  # direct estimates
+  direct <- subset(est, variable == myoutcome)
+  # covariates
+  if(myoutcome %in% c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri", "nt_ebf")){
+    v_cov_mod <- v_cov[!(v_cov %in% "child_age")]
+  }
+  if(myoutcome %in% c("nt_ch_micro_vas", "nt_ch_micro_dwm")){
+    v_cov_mod <- v_cov[!(v_cov %in% "mother_age")]
+  }
+  v_cov_mod <- sort(v_cov_mod)
+  
+  # check that there are any covariates. because there will be zero if the only covariate with child_age or mother_age.
+  if(length(v_cov_mod) != 0){
+    # survey design
+    if(myoutcome %in% c("nt_ebf", "nt_ch_micro_vas", "nt_ch_micro_dwm")){
+      dhs <- dhs_chld
+    }
+    if(myoutcome %in% c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri")){
+      dhs <- dhs_mth
+    }
+    design <- dhs %>% as_survey_design(ids = "v001", # psu
+                                       strata = "v023", # strata for sampling
+                                       weights = "wt",
+                                       nest = TRUE)
+    #X_covar <- covar %>% select(ADM2_EN, all_of(v_cov_mod)) # Should have area name and covariates
+    
+    # model formula
+    fmla <- as.formula(paste(myoutcome, "~", paste(v_cov_mod, collapse = " + ")))
+    
+    # Including area level covariates in continuous response model
+    summer.brfss <- smoothArea(fmla,
                                design = design,
+                               X.domain = covar,
+                               domain= ~ADM2_EN,
+                               adj.mat = mat, 
                                transform = "logit",
-                               adj.mat = mat, level = 0.95,
-                               pc.u = 0.1, pc.alpha = 0.01)
-
-# create map plots
-toplot <-  summer.brfss$bym2.model.est
-toplot$logit.var <- toplot$var / 
-  (summer.brfss$bym2.model.est$median ^ 2 * 
-     (1 - summer.brfss$bym2.model.est$median) ^ 2)
-toplot$median.alt <-  summer.brfss.alt$bym2.model.est$median
-toplot$logit.var.alt <-  summer.brfss.alt$bym2.model.est$var / 
-  (summer.brfss.alt$bym2.model.est$median ^ 2 *
-     (1 - summer.brfss.alt$bym2.model.est$median) ^ 2)
-toplot$median.sae <- results$eblup.SFH
-toplot$mse.sae <- results$mse
-variables <- c("median", "median.alt",  "median.sae",
-               "logit.var", "logit.var.alt", "mse.sae")
-names <- c("Median (default prior)", "Median (new prior)",  "EBLUP (sae)",
-           "Variance (default prior)", "Variance (new prior)", "MSE (sae)")
-# mapPlot(data = toplot, geo = bangladesh_2,
-#         variables=variables[1:3], 
-#         labels = names[1:3], by.data = "domain",
-#         by.geo = "ADM2_EN", size = 0.1) 
-# mapPlot(data = toplot, geo = bangladesh_2,
-#         variables=variables[4:6], labels = names[4:6],
-#         by.data = "domain", by.geo = "ADM2_EN", size = 0.1) 
+                               level = 0.95)
+    
+    # Save model info
+    n_vers <- old_modinfo %>% 
+      filter(outcome == myoutcome) %>%
+      nrow() + 1
+    filename <- paste0(model_name, "-", myoutcome, "-", n_vers)
+    df_info <- data.frame(file = filename,
+                          model_name = model_name,
+                          vers = n_vers,
+                          outcome = myoutcome,
+                          cov = paste(v_cov_mod, collapse = ","),
+                          date = format(Sys.Date(), "%Y%m%d"))
+    modinfo <- rbind(modinfo, df_info)
+    
+    # Save model fit
+    write.csv(summer.brfss$bym2.model.est, paste0("./gen/model/pred-summer/pred-", filename, ".csv"), row.names = FALSE)
+  }
+}
 
 
-df_plot <- rbind(summer.brfss$direct.est,
-                 summer.brfss$bym2.model.est)
-df_plot$method[df_plot$method == "Direct"] <- "1 - direct"
-df_plot$method[df_plot$method == "Area level model: BYM2"] <- "2 - area level model: BYM2" 
-p <- df_plot %>%
-  ggplot(aes(x = domain, y = mean, color = method, group = method)) +
-  geom_errorbar(aes(ymin = lower, ymax = upper), position = position_dodge(width = 0.8), width = 0.2) +
-  geom_point(position = position_dodge(width = 0.8)) +
-  labs(x = "", y = "") +
-  theme_bw() +
-  coord_flip() +
-  labs(title = outcome) +
-  theme(text = element_text(size = 10), legend.title=element_blank()) +
-  scale_color_discrete(guide = guide_legend(reverse = TRUE)) 
-ggsave(paste0("./gen/visualizations/uncert-int/", outcome,"-summer.png"), p, width = 8, height = 15, limitsize = F)
+# if old model info has the same file name as in new, drop
+if(nrow(old_modinfo) > 0){
+  old_modinfo <- subset(old_modinfo, !(file %in% modinfo$file))
+}
+new_modinfo <- rbind(modinfo, old_modinfo)
+new_modinfo <- new_modinfo[order(new_modinfo$outcome, new_modinfo$vers),]
+write.csv(new_modinfo, paste0("./gen/model/audit/model-info-summer.csv"), row.names = FALSE)
+#write.csv(df_modinfo, paste0("./gen/model/audit/model-info-summer.csv"), row.names = FALSE)
+
+
