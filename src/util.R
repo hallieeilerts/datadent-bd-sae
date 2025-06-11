@@ -379,3 +379,19 @@ fn_gen_fp_cusy_w_mod <- function(x){
   
 }
 
+check_overlap<- function(xmin, xmax, ymin, ymax) {
+  # Ensure inputs are vectors of the same length
+  if (length(xmin) != length(xmax) || length(ymin) != length(ymax)) {
+    stop("Input vectors must have the same length.")
+  }
+  
+  # Check for NA values
+  overlap <- ifelse(
+    is.na(xmin) | is.na(xmax) | is.na(ymin) | is.na(ymax),
+    NA, # Return NA if any input in the pair is NA
+    !(xmax < ymin | ymax < xmin) # Otherwise, compute overlap
+  )
+  
+  return(overlap)
+}
+
