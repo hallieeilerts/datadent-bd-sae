@@ -23,6 +23,10 @@ dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM",
 # ch_rotav3_either CH_VACC_C_RT2
 # ch_meas_either CH_VACC_C_MSL
 
+
+# adm2 --------------------------------------------------------------------
+
+
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
 naive <- dhs %>% 
@@ -67,10 +71,38 @@ dir_var <- dir_var %>%
 
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
-  group_by(ADM2_EN) %>%
+  group_by(ADM1_EN, ADM2_EN) %>%
   summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
             degf = n_obs - 1,
             sum_wgt = sum(wt))
+
+
+### WORKING HERE NEED THE HOUSEHOLD WEIGHTS
+# household data... (aka nga_analysis_df)
+# includes household locations, household info, weights
+# dhs_wgt <- dhs %>%
+#   group_by(ADM1_EN, ADM2_EN) %>%
+#   summarise(sum_wgt = sum(wt))
+#   reframe(hhid = hhid, 
+#           survey_wgt = wt,
+#           sum_wgt = sum(wt),
+#           norm_survey_wgt = survey_wgt/sum_wgt) %>%
+#   select(-ADM2_EN, survey_wgt)
+# # State level Validation
+# dat_hhd <- dhs %>%
+#   group_by(ADM1_EN) %>%
+#   reframe(hhid = hhid, 
+#           survey_wgt = wt,
+#           sum_wgt_state = sum(wt),
+#           norm_survey_wgt_state = survey_wgt/sum_wgt_state) %>%
+#   select(-ADM1_EN, survey_wgt)
+# vb12_inad_state <- dat_hhd |> group_by(ADM1_EN) |>
+#   summarise(n_obs = n(),
+#             n_eff = 1/sum(norm_survey_wgt_state^2),
+#             vb12_inad_wdir =  weighted.mean(vb12_inadequate, norm_survey_wgt_state),
+#             vb12_inad_wdir_var = vb12_inad_wdir*(1-vb12_inad_wdir)/degf
+#   ) 
+
 
 # MERGE
 
@@ -79,7 +111,13 @@ est_adm2 <- dhs_codes %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dir, by = c("ADM2_EN", "variable")) %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
-  left_join(dhs_degf, by = c("ADM2_EN"))
+  left_join(dhs_degf, by = c("ADM2_EN")) 
+
+# Include adm1, include weights
+
+
+# adm1 --------------------------------------------------------------------
+
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
 
@@ -107,6 +145,8 @@ est_adm1 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
   left_join(dir_var, by = c("ADM1_EN", "variable"))
 
+
+# adm0 --------------------------------------------------------------------
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM0 LEVEL FOR AUDIT WITH DHS STATCOMPILER
 

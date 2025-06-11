@@ -21,6 +21,7 @@ dhs_codes <- data.frame(dhs_indicator_code = c(NA, "RH_ANCN_W_N4P", NA),
 # nt_wm_micro_iron - not in statcompiler because i changed it to a binary indicator for <90 days or 90+ days
 # rh_anc_1tri
 
+# adm2 --------------------------------------------------------------------
 
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
@@ -66,7 +67,7 @@ dir_var <- dir_var %>%
 
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
-  group_by(ADM2_EN) %>%
+  group_by(ADM1_EN, ADM2_EN) %>%
   summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
             degf = n_obs - 1,
             sum_wgt = sum(wt))
@@ -79,6 +80,9 @@ est_adm2 <- dhs_codes %>%
   left_join(dir, by = c("ADM2_EN", "variable")) %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
+
+# adm1 --------------------------------------------------------------------
+
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
 
@@ -105,6 +109,8 @@ dir_var <- dir_var %>%
 est_adm1 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
   left_join(dir_var, by = c("ADM1_EN", "variable"))
+
+# adm0 --------------------------------------------------------------------
 
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM0 LEVEL FOR AUDIT WITH DHS STATCOMPILER
