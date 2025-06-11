@@ -1,5 +1,5 @@
 ################################################################################
-#' @description Run model for each indicator
+#' @description Fit model with just intercept
 #' @return Model fit
 ################################################################################
 #' Clear environment
@@ -31,7 +31,7 @@ if(sum(grepl("model-info", audit_files)) > 0){
 ################################################################################
 
 # set model
-vers <- "002"
+vers <- "100" 
 test <- "Test1"
 model_name <- "ArealBYM2"
 model_file <- "areal_level_BYM2_intercept.stan"
@@ -56,7 +56,9 @@ modinfo <- data.frame()
 
 for(i in 1:length(v_var)){
   
+  #i <- 3
   outcome <- v_var[i]
+  print(outcome)
   file_name <- paste(model_name, outcome, vers, test, sep = "-")
   
   # subset indicator
@@ -65,7 +67,7 @@ for(i in 1:length(v_var)){
   
   # join spatial data
   ind_dist <- bangladesh_2 %>% 
-    left_join(ind_dat, by = "ADM2_EN") %>%
+    left_join(ind_dat, by = c("ADM1_EN", "ADM2_EN")) %>%
     arrange(ADM2_EN)
     
   
@@ -78,9 +80,6 @@ for(i in 1:length(v_var)){
   # Compile model
   mod <- cmdstan_model(stanfile)
   data_list <- list(
-    # adding FE
-    #D = 
-    #X = df[,c(“cov1”,”cov2”)]
     N = nrow(ind_dist),
     NS = nrow(ind_dist_complete),
     adm2_index = ind_dist_complete$district_id,
@@ -119,6 +118,7 @@ for(i in 1:length(v_var)){
                          vers = vers,
                          test = test,
                          outcome = outcome,
+                         cov = 1,
                          chains = nchains,
                          iter = niter,
                          burnin = burnin,
