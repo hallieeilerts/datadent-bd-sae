@@ -32,7 +32,7 @@ if(sum(grepl("model-info", audit_files)) > 0){
 
 # set model
 vers <- "100" 
-test <- "Test1"
+test <- "Test2"
 model_name <- "ArealBYM2"
 model_file <- "areal_level_BYM2_intercept.stan"
 
@@ -56,7 +56,6 @@ modinfo <- data.frame()
 
 for(i in 1:length(v_var)){
   
-  #i <- 3
   outcome <- v_var[i]
   print(outcome)
   file_name <- paste(model_name, outcome, vers, test, sep = "-")
