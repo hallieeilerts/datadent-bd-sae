@@ -40,10 +40,12 @@ source("./src/model/fit-summer.R", local = new.env())
 source("./src/visualizations/facet-maps.R", local = new.env())
 source("./src/visualizations/tmap.R", local = new.env())
 source("./src/visualizations/uncert-int.R", local = new.env())
+source("./src/visualizations/compare-summer.R", local = new.env())
 
 # Validation --------------------------------------------------------------
 
-source("./src/validation/aggregate-adm1-est.R", local = new.env())
+source("./src/validation/aggregate-adm2-pred.R", local = new.env())
+source("./src/validation/calc-agg-error.R", local = new.env())
 
 
 
