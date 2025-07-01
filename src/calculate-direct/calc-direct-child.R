@@ -24,7 +24,7 @@ dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM",
 # ch_meas_either CH_VACC_C_MSL
 
 
-# adm2 --------------------------------------------------------------------
+# adm2 naive --------------------------------------------------------------------
 
 
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
@@ -43,31 +43,175 @@ naive_var <- dhs %>%
             nt_ebf = var(nt_ebf, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
-# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
 
-# dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
-#                                     strata = "region_name", # division
+# adm2 direct (without synthetic household) -------------------------------
+
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
+# After fixing bug in nt_ebf, need synthetic household because some districts have all same value and can't calculate variance
+# so rewrote this code below to calculate synthetic household only for indicators that need it.
+# worth doing because about to add more indicators to analysis.
+
+# dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
+#                                     strata = "v023", # strata for sampling
 #                                     weights = "wt",
 #                                     nest = TRUE)
-dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
-                                    strata = "v023", # strata for sampling
-                                    weights = "wt",
-                                    nest = TRUE)
+# 
+# dir <- dhs_svy %>%
+#   group_by(ADM2_EN) %>%
+#   summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
+#             nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
+#             nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"))
+# v_var <- names(dir)[grepl("_var", names(dir))]
+# v_dir <- names(dir)[!grepl("_var", names(dir))]
+# dir_var <- dir[,c("ADM2_EN", v_var)]
+# names(dir_var) <- gsub("_var", "", names(dir_var))
+# dir <- dir[,v_dir]
+# dir <- dir %>%
+#   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
+# dir_var <- dir_var %>%
+#   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
+# 
+# # calculate degrees of freedom
+# dhs_degf <- dhs %>%
+#   group_by(ADM1_EN, ADM2_EN) %>%
+#   summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
+#             degf = n_obs - 1,
+#             sum_wgt = sum(wt))
+# 
+# # MERGE
+# 
+# est_adm2 <- dhs_codes %>%
+#   left_join(naive, by = c("variable")) %>%
+#   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
+#   left_join(dir, by = c("ADM2_EN", "variable")) %>%
+#   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
+#   left_join(dhs_degf, by = c("ADM2_EN"))
 
-dir <- dhs_svy %>% 
-  group_by(ADM2_EN) %>% 
-  summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
-            nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
-            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var")) 
-v_var <- names(dir)[grepl("_var", names(dir))]
-v_dir <- names(dir)[!grepl("_var", names(dir))]
-dir_var <- dir[,c("ADM2_EN", v_var)]
-names(dir_var) <- gsub("_var", "", names(dir_var))
-dir <- dir[,v_dir]
-dir <- dir %>%
-  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
-dir_var <- dir_var %>%
-  pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
+# adm2 direct --------------------------------------------------------------------
+
+# For indicators that require synthetic household
+l_res <- list()
+v_allonecat <- unique(subset(naive, naive %in% c(0,1))$variable)
+v_rest <- unique(subset(naive, !variable %in% v_allonecat)$variable)
+if (length(v_allonecat) > 0) {
+  
+  set.seed(1234)
+  
+  # For each indicator which requires a synthetic household 
+  for (i in seq_along(v_allonecat)) {
+    
+    # Grab the variable name as a symbol
+    var_sym <- sym(v_allonecat[i])
+    
+    # Identify districts needing synthetic household for this variable
+    v_dist_01 <- naive %>%
+      filter(variable %in% v_allonecat[i], naive %in% c(0, 1)) %>%
+      pull(ADM2_EN)
+    # Hallie addition: identify other districts that also need it because their clusters all the have the same mean
+    # and within each cluster the weights are all the same.
+    # Not happy with the variance for these though. Seems too small. c("Meherpur", "Narail")
+    v_dist_01_aug <- dhs %>% 
+          filter(!is.na(!!var_sym)) %>%
+          group_by(ADM2_EN, v001) %>%
+          mutate(var_avg = mean(!!var_sym),
+                 n_uniq_wt = n_distinct(wt)) %>%
+          group_by(ADM2_EN) %>%
+          mutate(n_uniq_var = n_distinct(var_avg)) %>%
+          filter(n_uniq_wt == 1 & n_uniq_var == 1) %>% 
+          select(ADM2_EN) %>% unique() %>% pull(ADM2_EN)
+    v_dist_01 <- sort(unique(c(v_dist_01, v_dist_01_aug)))
+    
+    # Subset districts
+    dist_01 <- dhs %>% filter(ADM2_EN %in% v_dist_01)
+    dist_rest <- dhs %>% filter(!ADM2_EN %in% v_dist_01)
+    
+    #View(subset(dhs, ADM2_EN %in% c("Khagrachhari", "Meherpur", "Narail")))
+    # Khagrachhar is in dist_01
+    # the other two are in dist_rest
+    # View(subset(dhs, ADM2_EN == "Khagrachhari"))
+    # table(subset(dhs, ADM2_EN == "Khagrachhari")$nt_ebf)
+    # table(subset(dhs, ADM2_EN == "Meherpur")$nt_ebf)
+    # table(subset(dhs, ADM2_EN == "Narail")$nt_ebf)
+    # View(subset(dhs, ADM2_EN == "Meherpur" & !is.na(nt_ebf)))
+    
+    # For each district
+    for (j in seq_along(v_dist_01)) {
+      
+      df_tmp <- dist_01 %>%
+        filter(ADM2_EN == v_dist_01[j], !is.na(!!var_sym))
+      if (nrow(df_tmp) == 0){
+       stop("sparse data") 
+      }
+      df_synthetic <- df_tmp %>%
+        slice_sample(n = 1) %>%
+        mutate(!!var_sym := abs(!!var_sym - 1),
+               v001 = j)
+        
+        dist_01 <- bind_rows(dist_01, df_synthetic)
+    }
+    
+    # Combine
+    dhs_syn <- bind_rows(dist_rest, dist_01)
+    
+    dhs_svy <- dhs_syn %>% as_survey_design(ids = "v001", # psu
+                                        strata = "v023", # strata for sampling
+                                        weights = "wt",
+                                        nest = TRUE)
+    
+    dir <- dhs_svy %>%
+      group_by(ADM2_EN) %>%
+      summarise(!!var_sym := survey_mean({{var_sym}}, na.rm = TRUE, vartype = "var"))
+    v_var <- names(dir)[grepl("_var", names(dir))]
+    v_dir <- names(dir)[!grepl("_var", names(dir))]
+    dir_var <- dir[,c("ADM2_EN", v_var)]
+    names(dir_var) <- gsub("_var", "", names(dir_var))
+    dir <- dir[,v_dir]
+    dir <- dir %>%
+      pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
+    dir_var <- dir_var %>%
+      pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
+    
+    res <- dir %>%
+      left_join(dir_var, by = c("ADM2_EN", "variable"))
+    l_res[[i]] <- res
+  }
+}
+df_res_syn <- do.call(rbind, l_res)
+
+# For each indicator that does not require a synthetic household 
+l_res <- list()
+for (i in seq_along(v_rest)) {
+
+  # Grab the variable name as a symbol
+  var_sym <- sym(v_rest[i])
+  
+  dhs_svy <- dhs_syn %>% as_survey_design(ids = "v001", # psu
+                                          strata = "v023", # strata for sampling
+                                          weights = "wt",
+                                          nest = TRUE)
+  dir <- dhs_svy %>%
+    group_by(ADM2_EN) %>%
+    summarise(!!var_sym := survey_mean({{var_sym}}, na.rm = TRUE, vartype = "var"))
+  v_var <- names(dir)[grepl("_var", names(dir))]
+  v_dir <- names(dir)[!grepl("_var", names(dir))]
+  dir_var <- dir[,c("ADM2_EN", v_var)]
+  names(dir_var) <- gsub("_var", "", names(dir_var))
+  dir <- dir[,v_dir]
+  dir <- dir %>%
+    pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
+  dir_var <- dir_var %>%
+    pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
+  
+  res <- dir %>%
+    left_join(dir_var, by = c("ADM2_EN", "variable"))
+  l_res[[i]] <- res
+  
+}
+df_res_rest <- do.call(rbind, l_res)
+
+# combine
+df_res <- rbind(df_res_rest, df_res_syn)
+df_res <- df_res[order(df_res$variable, df_res$ADM2_EN),]
 
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
@@ -76,45 +220,13 @@ dhs_degf <- dhs %>%
             degf = n_obs - 1,
             sum_wgt = sum(wt))
 
-
-### WORKING HERE NEED THE HOUSEHOLD WEIGHTS
-# household data... (aka nga_analysis_df)
-# includes household locations, household info, weights
-# dhs_wgt <- dhs %>%
-#   group_by(ADM1_EN, ADM2_EN) %>%
-#   summarise(sum_wgt = sum(wt))
-#   reframe(hhid = hhid, 
-#           survey_wgt = wt,
-#           sum_wgt = sum(wt),
-#           norm_survey_wgt = survey_wgt/sum_wgt) %>%
-#   select(-ADM2_EN, survey_wgt)
-# # State level Validation
-# dat_hhd <- dhs %>%
-#   group_by(ADM1_EN) %>%
-#   reframe(hhid = hhid, 
-#           survey_wgt = wt,
-#           sum_wgt_state = sum(wt),
-#           norm_survey_wgt_state = survey_wgt/sum_wgt_state) %>%
-#   select(-ADM1_EN, survey_wgt)
-# vb12_inad_state <- dat_hhd |> group_by(ADM1_EN) |>
-#   summarise(n_obs = n(),
-#             n_eff = 1/sum(norm_survey_wgt_state^2),
-#             vb12_inad_wdir =  weighted.mean(vb12_inadequate, norm_survey_wgt_state),
-#             vb12_inad_wdir_var = vb12_inad_wdir*(1-vb12_inad_wdir)/degf
-#   ) 
-
-
-# MERGE
-
 est_adm2 <- dhs_codes %>%
   left_join(naive, by = c("variable")) %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
-  left_join(dir, by = c("ADM2_EN", "variable")) %>%
-  left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
-  left_join(dhs_degf, by = c("ADM2_EN")) 
+  left_join(df_res, by = c("ADM2_EN", "variable")) %>%
+  left_join(dhs_degf, by = c("ADM2_EN"))
 
-# Include adm1, include weights
-
+#View(subset(est_adm2, variable == "nt_ebf" & ADM2_EN %in% c("Meherpur", "Narail")))
 
 # adm1 --------------------------------------------------------------------
 

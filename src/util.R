@@ -106,10 +106,43 @@ prepare_bym2 <- function(adj_mat) {
   return(list(n1 = nodes$n1, n2 = nodes$n2, scaling_factor = scl))
 }
 
+# Validation helper functions ---------------------------------------------
+
+check_overlap<- function(xmin, xmax, ymin, ymax) {
+  # Ensure inputs are vectors of the same length
+  if (length(xmin) != length(xmax) || length(ymin) != length(ymax)) {
+    stop("Input vectors must have the same length.")
+  }
+  
+  # Check for NA values
+  overlap <- ifelse(
+    is.na(xmin) | is.na(xmax) | is.na(ymin) | is.na(ymax),
+    NA, # Return NA if any input in the pair is NA
+    !(xmax < ymin | ymax < xmin) # Otherwise, compute overlap
+  )
+  
+  return(overlap)
+}
+
 # KR variables ------------------------------------------------------------
 
+# //Children age 6-59 mos given iron supplements
+fn_gen_nt_ch_micro_iron <- function(x){
+  
+  # h42: Taking iron pills, sprinkles with iron or iron syrup in the last 7 days
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+       mutate(nt_ch_micro_iron =
+               case_when(
+                 age_months < 6 | age_months > 59 | b5==0 ~ 99, 
+                 h42!=1 ~ 0 ,
+                 h42==1 ~ 1 )) %>%
+       replace_with_na(replace = list(nt_ch_micro_iron = c(99))) 
+  return(x)
+  
+}
 
-# Children age 6-59 mos given Vit. A supplements
+# //Children age 6-59 mos given Vit. A supplements
 fn_gen_nt_ch_micro_vas	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
@@ -138,7 +171,7 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   
 }
 
-# Children age 6-59 mos given deworming medication
+# //Children age 6-59 mos given deworming medication
 fn_gen_nt_ch_micro_dwm	<- function(x){
   
   x$age_months <- x$v008 - x$b3
@@ -179,6 +212,9 @@ fn_gen_ch_rotav3_either	<- function(x){
     return(x)
 }
 
+# BD 2022 doesn't have
+# Children aged 12-23m
+# Measles vaccination
 fn_gen_ch_meas_either	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
@@ -196,7 +232,7 @@ fn_gen_ch_meas_either	<- function(x){
   return(x)
 }
 
-# Exclusively breastfed - last-born under 6 months
+# //Exclusively breastfed - last-born under 6 months
 fn_gen_nt_ebf <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_IYCF.R
@@ -226,7 +262,7 @@ fn_gen_nt_ebf <- function(x){
 }
 
 
-# Mothers who received IYCF counseling in the last 6 months - NEW Indicator in DHS8
+# //Mothers who received IYCF counseling in the last 6 months - NEW Indicator in DHS8
 fn_gen_nt_counsel_iycf	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
@@ -241,7 +277,7 @@ fn_gen_nt_counsel_iycf	<- function(x){
   
 }
 
-# Child with minimum dietary diversity- last-born 6-23 months
+# //Child with minimum dietary diversity- last-born 6-23 months
 # v414, v411, v410, v412, v413, v000, m4
 fn_gen_nt_mdd	<- function(x){
   
@@ -303,7 +339,7 @@ fn_gen_nt_mdd	<- function(x){
 
 # IR variables ------------------------------------------------------------
 
-# Number of days women took iron supplements during last pregnancy
+# //Number of days women took iron supplements during last pregnancy (90+)
 fn_gen_nt_wm_micro_iron <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_WM_NUT.R
@@ -323,7 +359,7 @@ fn_gen_nt_wm_micro_iron <- function(x){
   return(x)
 }
 
-# ANC 4+ visits
+# //ANC 4+ visits
 fn_gen_rh_anc_4vs <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
@@ -371,27 +407,55 @@ fn_gen_rh_anc_1tri	<- function(x){
   return(x)
 }
 
-fn_gen_fp_cusm_w_mod <- function(x){
-  
-}
+# // Weighed during pregnancy
+# Care given during the last antenatal visit for the pregnancy
+# BASE: For M42A to M42E is women who had seen someone for antenatal care for their last born child (MIDX = 1 & M2N <> 1).
+# M2A-N: The type of person who gave prenatal care to the respondent prior to the last birth. A value of M2N would mean no one.
+# m42a_1, m42_2, m42a_3, m42a_4, m42a_5, m42a_6
 
-fn_gen_fp_cusy_w_mod <- function(x){
-  
-}
 
-check_overlap<- function(xmin, xmax, ymin, ymax) {
-  # Ensure inputs are vectors of the same length
-  if (length(xmin) != length(xmax) || length(ymin) != length(ymax)) {
-    stop("Input vectors must have the same length.")
-  }
-  
-  # Check for NA values
-  overlap <- ifelse(
-    is.na(xmin) | is.na(xmax) | is.na(ymin) | is.na(ymax),
-    NA, # Return NA if any input in the pair is NA
-    !(xmax < ymin | ymax < xmin) # Otherwise, compute overlap
-  )
-  
-  return(overlap)
-}
+#fn_gen_fp_cusm_w_mod <- function(x){}
+#fn_gen_fp_cusy_w_mod <- function(x){}
+
+
+# PR variables ------------------------------------------------------------
+
+# //Basic handwashing facility
+# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_HNDWSH.R
+# PRdata <- PRdata %>%
+#   mutate(ph_hndwsh_basic = 
+#            case_when(
+#              hv230b==1 & hv232==1 & hv102==1 ~ 1,
+#              hv230a<=3 & hv102==1 ~ 0)) %>%
+#   set_value_labels(ph_hndwsh_basic = c("Yes" = 1, "No"=0)) %>%
+#   set_variable_labels(ph_hndwsh_basic = "Basic handwashing facility")
+
+
+# HR variables ------------------------------------------------------------
+
+# //improved sanitation
+# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_SANI.R
+# WASHdata <- WASHdata %>% mutate(ph_sani_improve = case_when(
+#   ph_sani_type %in% c(11, 12, 13, 15, 21, 22, 41, 51) ~ 1,
+#   ph_sani_type %in% c(14, 23, 42, 43, 96) ~ 2,
+#   ph_sani_type ==31 ~ 3,
+#   ph_sani_type ==99 ~ NA)) %>%
+# set_value_labels(ph_sani_improve = 
+#                    c("improved sanitation" = 1,
+#                      "unimproved sanitation" = 2,
+#                      "open defecation" = 3)) %>%
+# set_variable_labels(ph_sani_improve = "Improved sanitation")
+
+
+# // improved water source
+# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_WATER.R
+# WASHdata <- WASHdata %>% mutate(ph_wtr_improve = case_when(
+#   ph_wtr_source %in% c(11, 12, 13, 14, 15, 21, 31, 41, 51, 61, 62, 65, 71, 72, 73) ~ 1,
+#   ph_wtr_source %in% c(30, 32, 40, 42, 43, 96) ~ 0,
+#   ph_wtr_source==99 ~ 99)) %>%
+#   set_value_labels(ph_wtr_improve = c(
+#     "improved" = 1,
+#     "unimproved/surface water" = 0,
+#     "missing" = 99)) %>%
+#   set_variable_labels(ph_wtr_improve = "Improved Water Source")
 
