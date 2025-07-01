@@ -13,8 +13,9 @@ library(ggplot2)
 library(tmap)
 #' Inputs
 source("./src/util.R")
-# Bangladesh district boundaries
+# Bangladesh division boundaries
 bangladesh_1 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm1_bbs_20201113")
+# Bangladesh district boundaries
 bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
 # direct estimates
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
@@ -22,7 +23,7 @@ est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 
 # choose indicator
 unique(est$variable)
-mynum <- 3
+mynum <- 6
 v_all_outcomes <- c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf", "nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri") 
 v_all_outlab <- c("Children 6-59m given Vit. A supplements", 
                   "Children 6-59m given deworming medication",
@@ -69,7 +70,7 @@ postpred_sf <- bangladesh_2 %>%
   left_join(postpred, by = "ADM2_EN")
 
 # Set which models to plot
-if(outcome %in% c("nt_wm_micro_iron", "nt_ch_micro_vas", "nt_ch_micro_dwm", "rh_anc_1tri", "nt_ebf")){
+if(outcome %in% c("nt_wm_micro_iron", "nt_ch_micro_vas", "nt_ch_micro_dwm", "rh_anc_1tri", "rh_anc_4vs", "nt_ebf")){
   v_plots <- c("direct", "050-Test1")
 }
 
@@ -94,11 +95,7 @@ plotdat$plotlabel <- ifelse(plotdat$plotlabel == "direct", "Direct", "Modeled")
 p1 <- ggplot() +
   geom_sf(data = plotdat, aes(fill = value), color = NA) +
   geom_sf(data = bangladesh_2, color = "black", fill = NA) +
-  scale_fill_gradientn(
-    colors = wes_palette("Zissou1", 100, type = "continuous"),
-    limits = c(0, max(plotdat$value, na.rm = TRUE)),  # adjust as needed
-    na.value = "grey80", name = ""
-  ) +
+  scale_fill_gradientn(colors = c("red", "yellow", "forestgreen"), name = "") +
   labs(title = outlab, subtitle = "Prevalence") +
   facet_wrap(~plotlabel) +
   theme_void() +
