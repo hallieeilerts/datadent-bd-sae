@@ -21,7 +21,7 @@ info_sum <- read.csv("./gen/model/audit/model-info-summer.csv")
 # set inputs
 
 # choose indicator
-mynum <- 2
+mynum <- 3
 v_all_outcomes <- c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf", "nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri") 
 v_all_outlab <- c("Children 6-59m given Vit. A supplements", 
                   "Children 6-59m given deworming medication",
@@ -71,7 +71,7 @@ if(length(filenames) > 1){
 
 postpred_value <- postpred %>%
   pivot_longer(
-    cols = c("dir" | starts_with("0") & ends_with("mean")),
+    cols = c("dir" | matches("^[0-9]") & ends_with("mean")),
     names_to = "name",
     values_to = "value"
   ) %>%
@@ -81,7 +81,7 @@ postpred_value <- postpred %>%
 
 postpred_var <- postpred %>%
   pivot_longer(
-    cols = c("dir_var" | starts_with("0") & ends_with("var")),
+    cols = c("dir_var" | matches("^[0-9]") & ends_with("var")),
     names_to = "name",
     values_to = "var"
   ) %>%
@@ -91,7 +91,7 @@ postpred_var <- postpred %>%
 
 postpred_qt_lb <- postpred %>%
   pivot_longer(
-    cols = c(starts_with("0") & ends_with("_qt_lb")),
+    cols = c(matches("^[0-9]") & ends_with("_qt_lb")),
     names_to = "name",
     values_to = "qt_lb"
   ) %>%
@@ -100,7 +100,7 @@ postpred_qt_lb <- postpred %>%
 
 postpred_qt_ub <- postpred %>%
   pivot_longer(
-    cols = c(starts_with("0") & ends_with("_qt_ub")),
+    cols = c(matches("^[0-9]") & ends_with("_qt_ub")),
     names_to = "name",
     values_to = "qt_ub"
   ) %>%
@@ -172,10 +172,16 @@ df_info_sum <- subset(info_sum, outcome == myoutcome)
 # if cov is NA in my model info, assign as 1
 df_info$cov[is.na(df_info$cov)] <- 1
 # create name column that matches with model predictions
-# keep only that and covariates
 df_info <- df_info %>%
   mutate(vers_padded = str_pad(as.character(vers), width = 3, side = "left", pad = "0")) %>%
-  mutate(name_mymodel = paste0(vers_padded, "-", test)) %>%
+  mutate(name_mymodel = paste0(vers_padded, "-", test)) 
+
+# CHOOSE WHICH TO COMPARE FROM MY MODELS
+
+df_info <- df_info %>%
+  filter(name_mymodel != "001-Test1") %>% # drop 001-Test1, which was model without intercept
+  filter(vers < 100 | vers >= 100) %>% # only keep >=100 to compare models with penalized complexity prior
+  #filter(test == "Test1") %>% # if vers>=100, keep test1 or test2 (the latter with less spatial smoothing due to pcp prior values)
   select(name_mymodel, cov)
 
 # keep only name and covariates for summer
@@ -185,10 +191,6 @@ df_info_sum <- df_info_sum %>%
 
 # merge
 mod_merge_key <- merge(df_info, df_info_sum, by = "cov")
-
-# Drop 001-Test1 from name_mymodel, which was model without intercept
-mod_merge_key <- subset(mod_merge_key, name_mymodel != "001-Test1")
-
 
 # Combine data ------------------------------------------------------------
 
@@ -210,21 +212,40 @@ dat$covgrp[dat$cov == 1] <- "Intercept"
 v_cov <- unique(dat$cov)
 v_cov <- v_cov[!is.na(v_cov)]
 
-for(i in 1:length(v_cov)){
+# plot one covariate combination
+# foo <- 1
+# dat %>%
+#   filter(model == "Direct" | cov %in% v_cov[foo]) %>%
+#   ggplot(aes(x = ADM2_EN, y = value, color = model)) +
+#   geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.8), width = 0.2) +
+#   geom_point(position = position_dodge(width = 0.8)) +
+#   labs(x = "", y = "") +
+#   theme_bw() +
+#   coord_flip() +
+#   labs(title = paste0(myoutcome, "~", v_cov[foo])) +
+#   theme(text = element_text(size = 14), legend.title=element_blank()) +
+#   scale_color_discrete(guide = guide_legend(reverse = TRUE))
+
+# Plot multiple covariate combos and save
+for(i in 1:nrow(mod_merge_key)){
+  
+  myrow <- mod_merge_key[i,]
+  mycov <- myrow$cov
+  mymodelname <- myrow$name_mymodel
+  
   p <- dat %>%
-    filter(model == "Direct" | cov %in% v_cov[i]) %>%
+    filter(model == "Direct" | cov %in% mycov) %>%
+    filter(!(model == "OurModel" & name != mymodelname)) %>% 
     ggplot(aes(x = ADM2_EN, y = value, color = model)) +
     geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.5), width = 0.2) +
     geom_point(position = position_dodge(width = 0.5)) +
     labs(x = "", y = "") +
     theme_bw() +
     coord_flip() +
-    labs(title = paste0(myoutcome, "~", v_cov[i])) +
+    labs(title = paste0(myoutcome, "~", mycov)) +
     theme(text = element_text(size = 14), legend.title=element_blank()) +
     scale_color_discrete(guide = guide_legend(reverse = TRUE))
-  ggsave(paste0("./gen/visualizations/compare-summer/", myoutcome,"-", v_cov[i], "-", format(Sys.Date(), "%Y%m%d"), ".png"), p, width = 8, height = 20, limitsize = F)
+  ggsave(paste0("./gen/visualizations/compare-summer/", myoutcome,"-", mycov, "-", mymodelname, "-", format(Sys.Date(), "%Y%m%d"), ".png"), p, width = 8, height = 20, limitsize = F)
 }
-
-
 
 
