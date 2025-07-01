@@ -14,15 +14,12 @@ library(stringr)
 library(patchwork)
 #' Inputs
 source("./src/util.R")
-# direct estiamtes
-est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 ################################################################################
 
 # load posterior predictions
 
 # choose indicator
-unique(est$variable)
-mynum <- 3
+mynum <- 1
 v_all_outcomes <- c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf", "nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri") 
 v_all_outlab <- c("Children 6-59m given Vit. A supplements", 
                   "Children 6-59m given deworming medication",
@@ -169,11 +166,10 @@ ggsave(paste0("./gen/visualizations/uncert-int/", outcome,"_", format(Sys.Date()
 # uncertainty intervals for Datadent presentation on may 13, 2025
 # need two panels
 plotdat <- postpred_plot %>%
-  filter(name %in% c("direct", "050-Test1",  "051-Test2")) %>%
+  filter(name %in% c("direct", "004-Test1")) %>%
   mutate(name = case_when(
     name == "direct" ~ "Direct",
-    name == "050-Test1" ~ "Modeled",
-    name == "051-Test2" ~ "Modeled 2",
+    name == "004-Test1" ~ "Modeled",
     TRUE ~ name)
   ) 
 df_dist <- plotdat %>%
@@ -217,17 +213,29 @@ ggsave(paste0("./gen/visualizations/uncert-int/combined-", outcome,"_", format(S
 # two panels with all models ----------------------------------------------
 
 plotdat <- postpred_plot %>%
-  filter(name %in% c("direct", "002-Test1", "003-Test1", "004-Test1", "005-Test1", "050-Test1")) %>%
+  filter(name %in% c("direct", "002-Test1", "003-Test1", "004-Test1", "005-Test1", "006-Test1",
+                     "050-Test1",  "051-Test1",
+                     "052-Test2", "053-Test2", "054-Test1", "055-Test1", "056-Test1")) %>%
   mutate(name = case_when(
     name == "direct" ~ "Direct",
-    name == "002-Test1" ~ "Baseline",
-    name == "003-Test1" ~ "Residence",
-    name == "004-Test1" ~ "Mother Edu",
-    name == "005-Test1" ~ "Wealth Index",
-    name == "050-Test1" ~ "Full",
+    #name == "002-Test1" ~ "Baseline",
+    #name == "003-Test1" ~ "Residence",
+    name == "004-Test1" ~ "Full",
+    name == "006-Test1" ~ "HHD under5",
+    name == "005-Test1" ~ "Wealth index",
+    #name == "050-Test1" ~ "Full",
+    name == "056-Test1" ~ "Wealth index, HHD under5, age",
+    #name == "052-Test2" ~ "Full52",
+    name == "051-Test1" ~ "Mother edu",
+    #name == "054-Test1" ~ "Full54",
+    #name == "055-Test1" ~ "Full55",
+    #name == "056-Test1" ~ "Full56",
     TRUE ~ name)
   ) %>%
-  mutate(name = factor(name, levels = c("Direct", "Baseline", "Residence", "Mother Edu", "Wealth Index", "Full")))
+  mutate(name = factor(name, levels = c("Direct", "Mother edu", "HHD under5", "Wealth index", 
+                                        "Wealth index, HHD under5, age", "Full"))) %>%
+  filter(name %in% c("Direct", "Mother edu", "HHD under5", "Wealth index", 
+                       "Wealth index, HHD under5, age", "Full")) 
 df_dist <- plotdat %>%
   select(ADM2_EN) %>%
   distinct() %>% arrange(ADM2_EN) %>%
@@ -246,6 +254,7 @@ p1 <- plot1 %>%
   theme(text = element_text(size = 12), legend.title=element_blank()) +
   scale_color_discrete(guide = guide_legend(reverse = TRUE)) +
   scale_y_continuous(limits = c(min(plotdat$lb), max(plotdat$ub)))
+p1
 p2 <- plot2 %>%
   ggplot(aes(x = ADM2_EN, y = value, color = name, group = name)) +
   geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.8), width = 0.2) +
