@@ -27,10 +27,14 @@ datLong <- data %>%
   pivot_longer(c(value, value_SC)) %>%
   mutate(series = ifelse(endsWith(name, '_SC'), "StatCompiler", "Calculated"))
 
-p1 <- ggplot(datLong) +
+# check rh_pnc_wm_2days, rh_pnc_wm_bfcounsel
+
+
+p1 <- datLong %>%
+  ggplot() +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
   facet_wrap(~variable) 
-ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare2.pdf"), p1, height = 10, width = 8, units = "in") 
+ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare3.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
 

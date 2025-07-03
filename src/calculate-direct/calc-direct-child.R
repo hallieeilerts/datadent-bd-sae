@@ -15,14 +15,17 @@ dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
 
 # SET DHS INDICATOR CODES
 
-dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM", "CN_BFSS_C_EBF"),
-                        variable = c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf"))
+dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM", "CN_BFSS_C_EBF", "CN_MIAC_C_MMN",
+                                               "CH_DIAT_C_ZNC", "CH_DIAT_C_ORS"),
+                        variable = c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf", "nt_ch_micro_mp",
+                                     "ch_diar_zinc", "ch_diar_ors"))
 
 # Not in survey
 # nt_counsel_iycf CN_IYCC_W_COU
 # ch_rotav3_either CH_VACC_C_RT2
 # ch_meas_either CH_VACC_C_MSL
-
+# ch_pent3_either CH_VACC_C_PT3
+# nt_ch_micro_iod CN_MIAC_C_IOD
 
 # adm2 naive --------------------------------------------------------------------
 
@@ -33,18 +36,25 @@ naive <- dhs %>%
   group_by(ADM2_EN) %>% 
   summarise(nt_ch_micro_vas = mean(nt_ch_micro_vas, na.rm = TRUE),
             nt_ch_micro_dwm = mean(nt_ch_micro_dwm, na.rm = TRUE),
-            nt_ebf = mean(nt_ebf, na.rm = TRUE)) %>%
+            nt_ebf = mean(nt_ebf, na.rm = TRUE),
+            nt_ch_micro_mp = mean(nt_ch_micro_mp, na.rm = TRUE),
+            ch_diar_zinc = mean(ch_diar_zinc, na.rm = TRUE),
+            ch_diar_ors = mean(ch_diar_ors, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
 naive_var <- dhs %>% 
   group_by(ADM2_EN) %>% 
   summarise(nt_ch_micro_vas = var(nt_ch_micro_vas, na.rm = TRUE),
             nt_ch_micro_dwm = var(nt_ch_micro_dwm, na.rm = TRUE),
-            nt_ebf = var(nt_ebf, na.rm = TRUE)) %>%
+            nt_ebf = var(nt_ebf, na.rm = TRUE),
+            nt_ch_micro_mp = var(nt_ch_micro_mp, na.rm = TRUE),
+            ch_diar_zinc = var(ch_diar_zinc, na.rm = TRUE),
+            ch_diar_ors = var(ch_diar_ors, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
 
-# adm2 direct (without synthetic household) -------------------------------
+
+# adm2 direct -------------------------------------------------------------
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
 # After fixing bug in nt_ebf, need synthetic household because some districts have all same value and can't calculate variance
@@ -87,7 +97,8 @@ naive_var <- dhs %>%
 #   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
 #   left_join(dhs_degf, by = c("ADM2_EN"))
 
-# adm2 direct --------------------------------------------------------------------
+
+# adm2 direct (with synthetic household option) ---------------------------
 
 # For indicators that require synthetic household
 l_res <- list()
@@ -95,7 +106,7 @@ v_allonecat <- unique(subset(naive, naive %in% c(0,1))$variable)
 v_rest <- unique(subset(naive, !variable %in% v_allonecat)$variable)
 if (length(v_allonecat) > 0) {
   
-  set.seed(1234)
+  set.seed(123)
   
   # For each indicator which requires a synthetic household 
   for (i in seq_along(v_allonecat)) {
@@ -242,7 +253,10 @@ dir <- dhs_svy %>%
   group_by(ADM1_EN) %>% 
   summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
             nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
-            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var")) 
+            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_mp = survey_mean(nt_ch_micro_mp, na.rm = TRUE, vartype = "var"),
+            ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
+            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM1_EN", v_var)]
@@ -270,7 +284,10 @@ dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
 dir <- dhs_svy %>% 
   summarise(nt_ch_micro_vas = survey_mean(nt_ch_micro_vas, na.rm = TRUE, vartype = "var"),
             nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"),
-            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var")) 
+            nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_mp = survey_mean(nt_ch_micro_mp, na.rm = TRUE, vartype = "var"),
+            ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
+            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[, v_var]

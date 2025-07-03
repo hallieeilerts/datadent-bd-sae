@@ -14,12 +14,23 @@ dhs <- read.csv("./gen/prepare-dhs/output/dat-mother.csv")
 
 # SET DHS INDICATOR CODES
 
-dhs_codes <- data.frame(dhs_indicator_code = c(NA, "RH_ANCN_W_N4P", NA),
-                        variable = c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1tri"))
+dhs_codes <- data.frame(dhs_indicator_code = c(NA, NA,
+                                               "RH_ANCN_W_N4P", NA, 
+                                               "RH_ANCS_W_BLP", "RH_ANCS_W_URN", "RH_ANCS_W_BLS", "RH_ANCS_W_WGT", 
+                                               "RH_PCMN_W_MOT","RH_PCMN_W_NBR","RH_CPCN_C_BRF"),
+                        variable = c("nt_wm_micro_iron", "nt_wm_micro_iron_any", 
+                                     "rh_anc_4vs", "rh_anc_1tri", 
+                                     "rh_anc_bldpres", "rh_anc_urine", "rh_anc_bldsamp", "rh_anc_wgt", 
+                                     "rh_pnc_wm_2days", "rh_pnc_nb_2days", "rh_pnc_wm_bfcounsel"))
 
 # Not in statcompiler
 # nt_wm_micro_iron - not in statcompiler because i changed it to a binary indicator for <90 days or 90+ days
 # rh_anc_1tri
+
+# Not in survey
+# nt_wm_micro_iod AN_MIAM_W_IOD
+
+#55.2 for RH_PCMN_W_MOT rh_pnc_wm_2days
 
 # adm2 --------------------------------------------------------------------
 
@@ -28,15 +39,31 @@ dhs_codes <- data.frame(dhs_indicator_code = c(NA, "RH_ANCN_W_N4P", NA),
 naive <- dhs %>% 
   group_by(ADM2_EN) %>% 
   summarise(nt_wm_micro_iron = mean(nt_wm_micro_iron, na.rm = TRUE),
+            nt_wm_micro_iron_any = mean(nt_wm_micro_iron_any, na.rm = TRUE),
             rh_anc_4vs = mean(rh_anc_4vs, na.rm = TRUE),
-            rh_anc_1tri = mean(rh_anc_1tri, na.rm = TRUE)) %>%
+            rh_anc_1tri = mean(rh_anc_1tri, na.rm = TRUE),
+            rh_anc_bldpres = mean(rh_anc_bldpres, na.rm = TRUE),
+            rh_anc_urine = mean(rh_anc_urine, na.rm = TRUE),
+            rh_anc_bldsamp = mean(rh_anc_bldsamp, na.rm = TRUE),
+            rh_anc_wgt = mean(rh_anc_wgt, na.rm = TRUE),
+            rh_pnc_wm_2days = mean(rh_pnc_wm_2days, na.rm = TRUE),
+            rh_pnc_nb_2days = mean(rh_pnc_nb_2days, na.rm = TRUE),
+            rh_pnc_wm_bfcounsel = mean(rh_pnc_wm_bfcounsel, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
 naive_var <- dhs %>% 
   group_by(ADM2_EN) %>% 
   summarise(nt_wm_micro_iron = var(nt_wm_micro_iron, na.rm = TRUE),
+            nt_wm_micro_iron_any = var(nt_wm_micro_iron_any, na.rm = TRUE),
             rh_anc_4vs = var(rh_anc_4vs, na.rm = TRUE),
-            rh_anc_1tri = var(rh_anc_1tri, na.rm = TRUE)) %>%
+            rh_anc_1tri = var(rh_anc_1tri, na.rm = TRUE),
+            rh_anc_bldpres = var(rh_anc_bldpres, na.rm = TRUE),
+            rh_anc_urine = var(rh_anc_urine, na.rm = TRUE),
+            rh_anc_bldsamp = var(rh_anc_bldsamp, na.rm = TRUE),
+            rh_anc_wgt = var(rh_anc_wgt, na.rm = TRUE),
+            rh_pnc_wm_2days = var(rh_pnc_wm_2days, na.rm = TRUE),
+            rh_pnc_nb_2days = var(rh_pnc_nb_2days, na.rm = TRUE),
+            rh_pnc_wm_bfcounsel = var(rh_pnc_wm_bfcounsel, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
@@ -53,8 +80,16 @@ dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
 dir <- dhs_svy %>% 
   group_by(ADM2_EN) %>% 
   summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),
+            nt_wm_micro_iron_any = survey_mean(nt_wm_micro_iron_any, na.rm = TRUE, vartype = "var"),
             rh_anc_4vs = survey_mean(rh_anc_4vs, na.rm = TRUE, vartype = "var"),
-            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var")) 
+            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldpres = survey_mean(rh_anc_bldpres, na.rm = TRUE, vartype = "var"),
+            rh_anc_urine = survey_mean(rh_anc_urine, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldsamp = survey_mean(rh_anc_bldsamp, na.rm = TRUE, vartype = "var"),
+            rh_anc_wgt = survey_mean(rh_anc_wgt, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_2days = survey_mean(rh_pnc_wm_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_nb_2days = survey_mean(rh_pnc_nb_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_bfcounsel = survey_mean(rh_pnc_wm_bfcounsel, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM2_EN", v_var)]
@@ -94,8 +129,16 @@ dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
 dir <- dhs_svy %>% 
   group_by(ADM1_EN) %>% 
   summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),
+            nt_wm_micro_iron_any = survey_mean(nt_wm_micro_iron_any, na.rm = TRUE, vartype = "var"),
             rh_anc_4vs = survey_mean(rh_anc_4vs, na.rm = TRUE, vartype = "var"),
-            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var")) 
+            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldpres = survey_mean(rh_anc_bldpres, na.rm = TRUE, vartype = "var"),
+            rh_anc_urine = survey_mean(rh_anc_urine, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldsamp = survey_mean(rh_anc_bldsamp, na.rm = TRUE, vartype = "var"),
+            rh_anc_wgt = survey_mean(rh_anc_wgt, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_2days = survey_mean(rh_pnc_wm_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_nb_2days = survey_mean(rh_pnc_nb_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_bfcounsel = survey_mean(rh_pnc_wm_bfcounsel, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM1_EN", v_var)]
@@ -122,8 +165,16 @@ dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
 
 dir <- dhs_svy %>% 
   summarise(nt_wm_micro_iron = survey_mean(nt_wm_micro_iron, na.rm = TRUE, vartype = "var"),
+            nt_wm_micro_iron_any = survey_mean(nt_wm_micro_iron_any, na.rm = TRUE, vartype = "var"),
             rh_anc_4vs = survey_mean(rh_anc_4vs, na.rm = TRUE, vartype = "var"),
-            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var")) 
+            rh_anc_1tri = survey_mean(rh_anc_1tri, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldpres = survey_mean(rh_anc_bldpres, na.rm = TRUE, vartype = "var"),
+            rh_anc_urine = survey_mean(rh_anc_urine, na.rm = TRUE, vartype = "var"),
+            rh_anc_bldsamp = survey_mean(rh_anc_bldsamp, na.rm = TRUE, vartype = "var"),
+            rh_anc_wgt = survey_mean(rh_anc_wgt, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_2days = survey_mean(rh_pnc_wm_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_nb_2days = survey_mean(rh_pnc_nb_2days, na.rm = TRUE, vartype = "var"),
+            rh_pnc_wm_bfcounsel = survey_mean(rh_pnc_wm_bfcounsel, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[, v_var]

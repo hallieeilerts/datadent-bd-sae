@@ -171,14 +171,14 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   
 }
 
-# //Children age 6-59 mos given deworming medication
+# //Children age 6-23 mos given deworming medication
 fn_gen_nt_ch_micro_dwm	<- function(x){
   
   x$age_months <- x$v008 - x$b3
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
   x$nt_ch_micro_dwm <- 0
   x$nt_ch_micro_dwm[(x$h43 == 1)] <- 1
-  x$nt_ch_micro_dwm[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
+  x$nt_ch_micro_dwm[(x$age_months <6 | x$age_months > 23 | x$b5 <= 0)] <- NA
   x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 0] <- 0
   x$nt_ch_micro_dwm[!is.na(x$nt_ch_micro_dwm) & x$nt_ch_micro_dwm == 1] <- 1
 
@@ -187,49 +187,6 @@ fn_gen_nt_ch_micro_dwm	<- function(x){
   
   return(x)
   
-}
-
-# BD 2022 doesn't have
-# Children aged 12-23m
-# Rotavirus 3rd dose vaccination according to either source
-fn_gen_ch_rotav3_either	<- function(x){
-  
-  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
-  x$age_months <- x$v008 - x$b3
-  x <- x %>%
-    mutate(agegroup = 
-             case_when(
-               age_months >=12 & age_months <=23 ~ 1,
-               age_months >=24 & age_months <=35 ~ 2)) %>%
-    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
-    mutate(rotav1 = case_when(h57 %in% c(1,2,3) ~ 1, h57%in%c(0,8) ~ 0  )) %>%
-    mutate(rotav2 = case_when(h58 %in% c(1,2,3) ~ 1, h58%in%c(0,8) ~ 0  )) %>%
-    mutate(rotav3 = case_when(h59 %in% c(1,2,3) ~ 1, h59%in%c(0,8) ~ 0  )) %>%
-    mutate(rotavsum= rotav1+rotav2+rotav3) %>%
-    mutate(ch_rotav3_either = case_when(rotavsum >=3 ~ 1, TRUE ~ 0 )) %>%
-    mutate(ch_rotav3_either = ifelse(vacage == 0, NA, ch_rotav3_either))
-    
-    return(x)
-}
-
-# BD 2022 doesn't have
-# Children aged 12-23m
-# Measles vaccination
-fn_gen_ch_meas_either	<- function(x){
-  
-  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
-  x$age_months <- x$v008 - x$b3
-  x <- x %>%
-    mutate(agegroup = 
-             case_when(
-               age_months >=12 & age_months <=23 ~ 1,
-               age_months >=24 & age_months <=35 ~ 2)) %>%
-    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
-    mutate(ch_meas_either = 
-           case_when(h9 %in% c(1,2,3) ~ 1, h9 %in% c(0,8) ~ 0)) %>%
-    mutate(ch_meas_either = ifelse(vacage == 0, NA, ch_meas_either))
-  
-  return(x)
 }
 
 # //Exclusively breastfed - last-born under 6 months
@@ -335,6 +292,210 @@ fn_gen_nt_mdd	<- function(x){
   
 }
 
+# // Children age 6-23 mos given multiple micronutrient powder
+fn_gen_nt_ch_micro_mp <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap11_NT/NT_CH_MICRO.R
+  x <- x %>%
+    mutate(age_months  = v008 - b3) %>%
+    mutate(nt_ch_micro_mp =
+             case_when(
+               age_months<6 | age_months>23 | b5==0 ~ 99, 
+               h80a!=1 ~ 0 ,
+               h80a==1 ~ 1 )) %>%
+    replace_with_na(replace = list(nt_ch_micro_mp = c(99))) 
+  
+  return(x)
+  
+}
+
+# //Given zinc for diarrhea
+# Percentage of children born in the five (or three) years preceding the survey with diarrhea in the two weeks preceding the survey who received zinc supplements
+fn_gen_ch_diar_zinc <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap10_CH/CH_DIAR.R
+  # //Diarrhea symptoms # //Zinc
+  x <- x %>%
+    mutate(ch_diar = 
+             case_when(
+               (h11==1 | h11==2) & b5==1 ~ 1,
+               b5==1 ~ 0  )) %>%
+    mutate(ch_diar_zinc =
+             case_when(
+               ch_diar==1 & h15e==1 ~ 1 ,
+               ch_diar==1 ~ 0)) 
+  
+  return(x)
+  
+}
+
+# //Given zinc for diarrhea
+# Percentage of children born in the five (or three) years preceding the survey with diarrhea in the two weeks preceding the survey who received oral rehydration solution (ORS), that is either fluid from an ORS packet or a pre-packaged ORS fluid
+fn_gen_ch_diar_ors <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap10_CH/CH_DIAR.R
+  # //Diarrhea symptoms # //Zinc
+  x <- x %>%
+    mutate(ch_diar = 
+             case_when(
+               (h11==1 | h11==2) & b5==1 ~ 1,
+               b5==1 ~ 0  )) %>%
+    mutate(ch_diar_ors =
+             case_when(
+               ch_diar==1 & (h13==1 | h13==2 | h13b==1)  ~ 1 ,
+               ch_diar==1 ~ 0)) 
+  
+  return(x)
+  
+}
+
+# KR variables - missing --------------------------------------------------
+
+# BD 2022 doesn't have
+# //Pentavalent 3rd dose vaccination according to either source
+# children 12-23m
+fn_gen_ch_pent3_either <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+  x <- x %>%
+    mutate(age_months = b19) %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    filter(agegroup==1 & b5==1) %>% # select age group and live children 
+    mutate(dpt1 = case_when(h3%in%c(1,2,3) ~ 1, h3%in%c(0,8) ~ 0  )) %>%
+    mutate(dpt2 = case_when(h5%in%c(1,2,3) ~ 1, h5%in%c(0,8) ~ 0  )) %>%
+    mutate(dpt3 = case_when(h7%in%c(1,2,3) ~ 1, h7%in%c(0,8) ~ 0  )) %>%
+    mutate(dptsum = dpt1 + dpt2 + dpt3) %>%
+    mutate(ch_pent3_either = case_when(dptsum >=3 ~ 1, TRUE ~ 0 ))
+  
+  return(x)
+}
+
+# BD 2022 doesn't have
+# Children aged 12-23m
+# Rotavirus 3rd dose vaccination according to either source
+fn_gen_ch_rotav3_either	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
+    mutate(rotav1 = case_when(h57 %in% c(1,2,3) ~ 1, h57%in%c(0,8) ~ 0  )) %>%
+    mutate(rotav2 = case_when(h58 %in% c(1,2,3) ~ 1, h58%in%c(0,8) ~ 0  )) %>%
+    mutate(rotav3 = case_when(h59 %in% c(1,2,3) ~ 1, h59%in%c(0,8) ~ 0  )) %>%
+    mutate(rotavsum= rotav1+rotav2+rotav3) %>%
+    mutate(ch_rotav3_either = case_when(rotavsum >=3 ~ 1, TRUE ~ 0 )) %>%
+    mutate(ch_rotav3_either = ifelse(vacage == 0, NA, ch_rotav3_either))
+  
+  return(x)
+}
+
+# BD 2022 doesn't have
+# Children aged 12-23m
+# Measles vaccination
+fn_gen_ch_meas_either	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+  x$age_months <- x$v008 - x$b3
+  x <- x %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    mutate(vacage = ifelse(agegroup==1 & b5==1, 1, 0)) %>% # select age group and live children 
+    mutate(ch_meas_either = 
+             case_when(h9 %in% c(1,2,3) ~ 1, h9 %in% c(0,8) ~ 0)) %>%
+    mutate(ch_meas_either = ifelse(vacage == 0, NA, ch_meas_either))
+  
+  return(x)
+}
+
+# //Children age 6-59 months living in household with iodized salt 
+# Percentage of children under five living in households using adequately iodized salt
+fn_gen_nt_ch_micro_iod <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap11_NT/NT_CH_MICRO.R
+  x <- x %>%
+    mutate(age = b19) %>%
+    mutate(nt_ch_micro_iod =
+             case_when(
+               age<6 | age>59 | b5==0 | hv234a>1 ~ 99,
+               hv234a==0   ~ 0, 
+               hv234a==1  ~ 1)) %>%
+    replace_with_na(replace = list(nt_ch_micro_iod = c(99)))
+  
+  return(x)
+}
+
+
+# Child drank or ate vitamin or mineral supplements yesterday
+
+
+# BR variables ------------------------------------------------------------
+
+# Institutional delivery - past 5 years
+fn_gen_rh_del_inst <- function(x){
+  
+  # I adjusted code for this. Didn't see exact code at the following link.
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_DEL.R
+  x <- x %>%
+    mutate(period = 60) %>%
+    mutate(age = b19) %>% # age of child
+    mutate(rh_del_pltype =
+             case_when(
+               m15 >=20 & m15<30   ~ 1 ,
+               m15 >=30 & m15<40   ~ 2 ,
+               m15 >=10 & m15<20   ~ 3,
+               m15 >=40 & m15<99   ~ 4 ,
+               m15 == 99 ~ 9 ,
+               age>=period ~ 99)) %>%
+    replace_with_na(replace = list(rh_del_pltype = c(99))) %>%
+    mutate(rh_del_inst =
+             case_when(
+               rh_del_pltype %in% c(1,2) ~ 1,
+               rh_del_pltype %in% c(3,4) ~ 0
+             ))
+  return(x)
+}
+
+# //Skilled provider during delivery
+fn_gen_rh_del_pvskill <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_DEL.R
+  x <- x %>%
+    mutate(period = 60) %>%
+    mutate(age = b19) %>% # age of child
+    mutate(rh_del_pv =
+             case_when(
+               m3a == 1   ~ 1 ,
+               m3b == 1 ~ 2,
+               m3c == 1 | m3d == 1 | m3e == 1 | m3f == 1~ 3 ,
+               m3g == 1 ~ 4 ,
+               m3h == 1 | m3i == 1 | m3j == 1 | m3k == 1 | m3l == 1 | m3m == 1 ~ 5 ,
+               m3n ==1 ~ 6,
+               m3a ==8 | m3a==9 ~ 9 ,
+               age>=period ~ 99)) %>%
+    replace_with_na(replace = list(rh_del_pv = c(99))) %>%
+    mutate(rh_del_pvskill =
+             case_when(
+               rh_del_pv %in% c(1,2)   ~ 1 , # skilled provider
+               rh_del_pv %in% c(3,4,5) ~ 2,  # unskilled provider
+               rh_del_pv ==6 ~ 3 , # no one
+               rh_del_pv==9 ~ 9 , # don't know
+               age>=period ~ 99)) %>%
+    replace_with_na(replace = list(rh_del_pvskill = c(99))) %>%
+    mutate(rh_del_pvskill =
+             case_when(
+               rh_del_pvskill==1 ~ 1,
+               rh_del_pvskill %in% c(2,3,9) ~ 0))
+  return(x)
+}
 
 
 # IR variables ------------------------------------------------------------
@@ -354,6 +515,26 @@ fn_gen_nt_wm_micro_iron <- function(x){
   x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron < 3] <-  0  # <90 days
   x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron >= 3] <- 1 # 90+ days
    
+  #set_value_labels(nt_wm_micro_iron = c("None"=0, "<60"=1, "60-89"=2, "90+"=3, "Don't know/missing"=4))
+  
+  return(x)
+}
+
+# //Women took any iron supplements during last pregnancy
+fn_gen_nt_wm_micro_iron_any <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_WM_NUT.R
+  x$nt_wm_micro_iron_any <- NA
+  x$nt_wm_micro_iron_any[x$v208 == 0] <- NA
+  x$nt_wm_micro_iron_any[x$m45_1 == 0] <- 0
+  x$nt_wm_micro_iron_any[x$m46_1 < 60] <- 1
+  x$nt_wm_micro_iron_any[x$m46_1 >= 60 & x$m46_1 < 90] <- 2
+  x$nt_wm_micro_iron_any[x$m46_1 >= 90 & x$m46_1 <= 300] <- 3
+  x$nt_wm_micro_iron_any[x$m46_1 >= 998 | x$m45_1 >= 8] <- NA
+  
+  x$nt_wm_micro_iron_any[!is.na(x$nt_wm_micro_iron_any) & x$nt_wm_micro_iron_any == 0] <-  0  # none
+  x$nt_wm_micro_iron_any[!is.na(x$nt_wm_micro_iron_any) & x$nt_wm_micro_iron_any >= 1] <- 1 # any
+  
   #set_value_labels(nt_wm_micro_iron = c("None"=0, "<60"=1, "60-89"=2, "90+"=3, "Don't know/missing"=4))
   
   return(x)
@@ -379,6 +560,30 @@ fn_gen_rh_anc_4vs <- function(x){
              case_when(
                rh_anc_numvs==3 ~ 1,
                rh_anc_numvs %in% c(0,1,2,9) ~ 0 ))
+  
+  return(x)
+}
+
+# //ANC 1+ visits
+fn_gen_rh_anc_1vs <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(period = 60) %>%
+    mutate(age = b19_01) %>% # age of child
+    mutate(rh_anc_numvs =
+             case_when(
+               m14_1 == 0 ~ 0 ,
+               m14_1 == 1 ~ 1 ,
+               m14_1  %in% c(2,3)   ~ 2 ,
+               m14_1>=4 & m14_1<=90  ~ 3 ,
+               m14_1>90  ~ 9 ,
+               age>=period ~ 99 )) %>%
+    replace_with_na(replace = list(rh_anc_numvs = c(99))) %>%
+    mutate(rh_anc_1vs =
+             case_when(
+               rh_anc_numvs%in% c(1,2,3) ~ 1,
+               rh_anc_numvs %in% c(0,9) ~ 0 ))
   
   return(x)
 }
@@ -417,45 +622,395 @@ fn_gen_rh_anc_1tri	<- function(x){
 #fn_gen_fp_cusm_w_mod <- function(x){}
 #fn_gen_fp_cusy_w_mod <- function(x){}
 
+# // Blood pressure was taken during ANC visit
+fn_gen_rh_anc_bldpres <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(ancany =
+             case_when(
+               m14_1 %in% c(0,99)   ~ 0 ,
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+    mutate(rh_anc_bldpres =
+             case_when(
+               m42c_1 == 1 & ancany==1 ~ 1,
+               ancany==1 ~ 0 ))
+  return(x)
+}
 
-# PR variables ------------------------------------------------------------
+# // Urine sample was taken during ANC visit
+fn_gen_rh_anc_urine <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(ancany =
+             case_when(
+               m14_1 %in% c(0,99)   ~ 0 ,
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+    mutate(rh_anc_urine =
+             case_when(
+               m42d_1 == 1 & ancany==1 ~ 1  ,
+               ancany==1 ~ 0 ))
+  return(x)
+}
 
-# //Basic handwashing facility
-# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_HNDWSH.R
-# PRdata <- PRdata %>%
-#   mutate(ph_hndwsh_basic = 
-#            case_when(
-#              hv230b==1 & hv232==1 & hv102==1 ~ 1,
-#              hv230a<=3 & hv102==1 ~ 0)) %>%
-#   set_value_labels(ph_hndwsh_basic = c("Yes" = 1, "No"=0)) %>%
-#   set_variable_labels(ph_hndwsh_basic = "Basic handwashing facility")
+# // Blood sample was taken during ANC visit
+fn_gen_rh_anc_bldsamp <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(ancany =
+             case_when(
+               m14_1 %in% c(0,99)   ~ 0 ,
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+    mutate(rh_anc_bldsamp =
+             case_when(
+               m42e_1 == 1 & ancany==1 ~ 1  ,
+               ancany==1 ~ 0 ))
+  return(x)
+}
+
+# //Weighed during pregnancy
+fn_gen_rh_anc_wgt <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(ancany =
+             case_when(
+               m14_1 %in% c(0,99)   ~ 0 ,
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+    mutate(rh_anc_wgt =
+             case_when(
+               m42a_1 == 1 & ancany==1 ~ 1  ,
+               ancany==1 ~ 0 ))
+  return(x)
+}
+
+# //Took iron tablet/syrup during the pregnancy of last birth
+fn_gen_rh_anc_iron <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(rh_anc_iron =
+             case_when(
+               m45_1 == 1 ~ 1 ,
+               v208 ==0 | age>=period ~ 99,
+               TRUE ~ 0))
+  return(x)
+}
+
+# //PNC check within two days for mother
+# This one is: Among most recent live births in the 2 years preceding the survey, percentage for which the mother age 15-49 received a postnatal check during the first 2 days after birth, RH_PCMN_W_MOT
+# national level estimate is 55.2
+# There is also: 	Percentage of women giving birth in the two years preceding the survey who had their first postnatal checkup 1-2 days after birth, RH_PCMT_W_D12
+# national level estimate is 8.6
+# THIS IS CURRENTLY THE ONLY INDICATOR THAT DOESN"T HAVE A GOOD MATCH WITH STATCOMPILER
+# TRY TO FIX
+fn_gen_rh_pnc_wm_2days <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap09_RH/RH_PNC.R
+  x <- x %>%
+    mutate(age = b19_01) %>% # age of child
+    mutate(momcheck =
+             case_when(
+               # m62_1 respondent's health checked after delivery before discharge
+               # m66_1 respondent's health checked after discharge/delivery at home
+               (m62_1!=1 & m66_1!=1) & age<24 ~ 0, 
+               (m62_1==1 | m66_1==1) & age<24 ~ 1,
+               age<24 ~ 0)) %>% #select(m62_1, m66_1, age, momcheck) %>% View
+    mutate(pnc_wm_time =
+             case_when(
+               # m64_1 who checked respondent's health before discharge
+               # m63_1 how long after delivery respondent's health check before discharge
+               (m64_1 >= 11 & m64_1 <= 29) & age<24 ~ as.numeric(m63_1), # tried changing m64_1 >= 11 to 10, no effect
+               age<24 & momcheck == 1 ~ 999)) %>%
+    mutate(pnc_wm_time1000 = 
+             case_when(
+               pnc_wm_time<1000 ~ 1)) %>%
+    mutate(pnc_wm_time =
+             case_when(
+               pnc_wm_time1000==1 & (m64_1 > 30 & m64_1 < 100) & age<24 ~ 0,
+               TRUE ~ pnc_wm_time )) %>%
+    mutate(pnc_wm_time999 = 
+             case_when(
+               pnc_wm_time==999 ~ 1)) %>%
+    mutate(pnc_wm_time =
+             case_when(
+               pnc_wm_time999==1 & (m68_1 >= 11 & m68_1 <= 29) & age<24 ~ m67_1, # tried changing m64_1 >= 11 to 10, no effect
+               TRUE ~ pnc_wm_time ))  %>%
+    mutate(pnc_wm_time0 =
+             case_when(
+               m67_1 < 1000 & m68_1 > 30 & m68_1 < 100 & age<24 ~ 1,
+               TRUE ~ 0)) %>%
+    mutate(pnc_wm_time =
+             case_when(
+               pnc_wm_time0==1 ~ 0,
+               pnc_wm_time0==0 ~ as.numeric(pnc_wm_time))) %>%
+    mutate(pnc_wm_time00 =
+             case_when(
+               momcheck==0 & age<24 ~ 1)) %>%
+    mutate(pnc_wm_time =
+             case_when(
+               pnc_wm_time00==1 ~ 0,
+               TRUE ~ as.numeric(pnc_wm_time))) %>%
+    mutate(rh_pnc_wm_timing =
+             case_when(
+               (pnc_wm_time >=242 & pnc_wm_time<=299) | (pnc_wm_time>=306 & pnc_wm_time<900) | pnc_wm_time==0  ~ 0 ,
+               pnc_wm_time  %in% c(100, 101, 102, 103)  ~ 1 ,
+               (pnc_wm_time >=104 & pnc_wm_time<=123) | pnc_wm_time==200 ~ 2 ,
+               (pnc_wm_time >=124 & pnc_wm_time<=171) | pnc_wm_time %in% c(201,202)~ 3,
+               (pnc_wm_time >=172 & pnc_wm_time<=197) | pnc_wm_time %in% c(203,204,205,206) ~ 4, 
+               (pnc_wm_time >=207 & pnc_wm_time<=241) | (pnc_wm_time >=301 & pnc_wm_time<=305)  ~ 5, 
+               pnc_wm_time  %in% c(198, 199, 298, 299, 298, 399, 998, 999)  ~ 9 ,
+               bidx_01!=1 | age>=24 ~ 99 )) %>%
+    replace_with_na(replace = list(rh_pnc_wm_timing = c(99))) %>%
+    mutate(rh_pnc_wm_2days =
+             case_when(
+               rh_pnc_wm_timing %in% c(1,2,3) ~ 1,
+               rh_pnc_wm_timing %in% c(0,4,5,9) ~ 0,
+               bidx_01!=1 | age>=24 ~ 99 )) %>%
+    replace_with_na(replace = list(rh_pnc_wm_2days = c(99))) 
+    # select(age, momcheck, m62_1, m63_1, m64_1, m66_1, m68_1, 
+    #        pnc_wm_time, pnc_wm_time1000, pnc_wm_time999, pnc_wm_time0, pnc_wm_time00,    
+    #        rh_pnc_wm_timing, rh_pnc_wm_2days) %>% View()
+  
+  return(x)
+}
+
+# //PNC check within two days for newborn
+# This one is: 	Among most recent live births in the 2 years preceding the survey, percentage for which the newborn received a postnatal check during the first 2 days after birth, RH_PCMN_W_NBR
+# national level estimate is 56.2
+# There is also: Percentage of last births in the two years preceding the survey who had their first postnatal checkup 1-2 days after birth, 	RH_PCCT_C_D12
+# national elvel estimate is 7.3
+fn_gen_rh_pnc_nb_2days <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap09_RH/RH_PNC.R
+  x <- x %>%
+    mutate(age = b19_01) %>% # age of child
+    mutate(rh_pnc_nb_timing =
+             case_when(
+               m70_1!=1 & m74_1!=1 ~ 0, #newborns with no check in first 2 months
+               (m76_1>=10 & m76_1<=29) & ((m75_1 >=207 & m75_1<=297) | (m75_1>=301 & m75_1<397)) ~ 0,
+               (m76_1>=10 & m76_1<=29) & m75_1 ==100 ~ 1 ,
+               (m76_1>=10 & m76_1<=29) & m75_1 %in% c(101,102,103) ~ 2 ,
+               (m76_1>=10 & m76_1<=29) & ((m75_1 >=104 & m75_1<=123) | m75_1==200) ~ 3,
+               (m76_1>=10 & m76_1<=29) & ((m75_1 >=124 & m75_1<=171) | m75_1 %in% c(201,202)) ~ 4, 
+               (m76_1>=10 & m76_1<=29) & ((m75_1 >=172 & m75_1<=197) | (m75_1 >=203 & m75_1<=206))  ~ 5, 
+               (m76_1>=10 & m76_1<=29) & m75_1 %in% c(198, 199, 298, 299, 398, 399, 998, 999)  ~ 9,
+               (m72_1>=10 & m72_1<=29) & ((m71_1 >=207 & m71_1<=297) | (m71_1>=301 & m71_1<397)) ~ 0,
+               (m72_1>=10 & m72_1<=29) & m71_1 ==100 ~ 1 ,
+               (m72_1>=10 & m72_1<=29) & m71_1 %in% c(101,102,103) ~ 2 ,
+               (m72_1>=10 & m72_1<=29) & ((m71_1 >=104 & m71_1<=123) | m71_1==200) ~ 3,
+               (m72_1>=10 & m72_1<=29) & ((m71_1 >=124 & m71_1<=171) | m71_1 %in% c(201,202)) ~ 4, 
+               (m72_1>=10 & m72_1<=29) & ((m71_1 >=172 & m71_1<=197) | (m71_1 >=203 & m71_1<=206))  ~ 5, 
+               (m72_1>=10 & m72_1<=29) & m71_1  %in% c(198, 199, 298, 299, 398, 399, 998, 999)  ~ 9,
+               m80_1==1 ~ 0))	  
+  x[["rh_pnc_nb_timing"]] <- ifelse(x[["bidx_01"]]!=1 | x[["age"]]>=24, NA, x[["rh_pnc_nb_timing"]])
+  # PNC within 2days for newborn	
+  x <- x %>%
+    mutate(rh_pnc_nb_2days =
+             case_when(
+               rh_pnc_nb_timing %in% c(1,2,3,4) ~ 1,
+               rh_pnc_nb_timing %in% c(0,5,9) ~ 0,
+               bidx_01!=1 | age>=24 ~ 99 )) %>%
+    replace_with_na(replace = list(rh_pnc_nb_2days = c(99)))
+  
+  return(x)
+}
+
+
+# //Breastfeeding counseling during first two days after birth
+# Among most recent live births in the 2 years preceding the survey, the percentage for whom counseling on breastfeeding was provided during the first 2 days after birth
+# I found a variable for during first 2 days health provider: counsel on breastfeeding (m78d_1)
+fn_gen_rh_pnc_wm_bfcounsel <- function(x){
+  
+  # during first 2 days health provider: counsel on breastfeeding
+  x <- x %>%
+    mutate(age = b19_01) %>% # age of child
+    mutate(rh_pnc_wm_bfcounsel =
+             case_when(
+               m78d_1 == 1 & age < 24 ~ 1,
+               m78d_1 == 0 & age < 24 ~ 0,
+               #is.na(m78d_1) & age < 24 ~ 0,
+               TRUE ~ NA
+             ))
+  
+  return(x)
+}
+
+# IR variables - missing --------------------------------------------------
+
+# //Breastfeeding counseling during pregnancy
+# m42h_1: na - during pregnancy: talk about breastfeeding
+
+# //Vitamin A supplementation in postpartum women
+# fn_gen_an_miam_w_vap <- function(x){}
+# m54_1: na - received vitamin a dose in first 2 months after delivery
+
+# //Woman living in household with iodized salt
+# Percentage of women with a birth in the past five years living in households using adequately iodized salt
+# hv234a: na - result of salt test for iodine
+# variable name doesn't not appear in IR file. it appears in HR file but is all NA.
+fn_gen_nt_wm_micro_iod <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap11_NT/NT_WM_NUT.R
+  x <- x %>%
+    mutate(nt_wm_micro_iod =
+             case_when(
+               v208==0 | hv234a>1  ~ 99,
+               hv234a==0   ~ 0, 
+               hv234a==1  ~ 1)) %>%
+    replace_with_na(replace = list(nt_wm_micro_iod = c(99)))
+  
+  return(x)
+}
 
 
 # HR variables ------------------------------------------------------------
 
-# //improved sanitation
-# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_SANI.R
-# WASHdata <- WASHdata %>% mutate(ph_sani_improve = case_when(
-#   ph_sani_type %in% c(11, 12, 13, 15, 21, 22, 41, 51) ~ 1,
-#   ph_sani_type %in% c(14, 23, 42, 43, 96) ~ 2,
-#   ph_sani_type ==31 ~ 3,
-#   ph_sani_type ==99 ~ NA)) %>%
-# set_value_labels(ph_sani_improve = 
-#                    c("improved sanitation" = 1,
-#                      "unimproved sanitation" = 2,
-#                      "open defecation" = 3)) %>%
-# set_variable_labels(ph_sani_improve = "Improved sanitation")
 
 
-# // improved water source
-# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_WATER.R
-# WASHdata <- WASHdata %>% mutate(ph_wtr_improve = case_when(
-#   ph_wtr_source %in% c(11, 12, 13, 14, 15, 21, 31, 41, 51, 61, 62, 65, 71, 72, 73) ~ 1,
-#   ph_wtr_source %in% c(30, 32, 40, 42, 43, 96) ~ 0,
-#   ph_wtr_source==99 ~ 99)) %>%
-#   set_value_labels(ph_wtr_improve = c(
-#     "improved" = 1,
-#     "unimproved/surface water" = 0,
-#     "missing" = 99)) %>%
-#   set_variable_labels(ph_wtr_improve = "Improved Water Source")
+# //improved water source
+fn_gen_ph_wtr_improve <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_WATER.R
+  x <- x %>% 
+    mutate(ph_wtr_source = case_when( 
+      hv201==14 ~ 13,
+      TRUE ~ hv201
+    )) %>% 
+    mutate(ph_wtr_improve = case_when(
+            ph_wtr_source %in% c(11, 12, 13, 14, 15, 21, 31, 41, 51, 61, 62, 65, 71, 72, 73) ~ 1,
+            ph_wtr_source %in% c(30, 32, 40, 42, 43, 96) ~ 0,
+            ph_wtr_source==99 ~ 99)) %>%
+    replace_with_na(replace = list(ph_wtr_improve = c(99)))
+  
+  return(x)
+  
+}
 
+# //Appropriately treated water before drinking
+# Percentage of households using an appropriate treatment method, including boiling, bleaching, filtering or solar disinfecting.
+fn_gen_ph_wtr_trt_appr <- function(x){
+  
+  x <- x %>% 
+    mutate(ph_wtr_trt_appr = case_when(
+            hv237a==1 ~ 1,
+            hv237b==1 ~ 1,
+            hv237d==1 ~ 1,
+            hv237e==1 ~ 1,
+            TRUE ~ 0)) 
+
+  return(x)
+  
+}
+
+# //Access to improved sanitation
+# Percentage of households with an improved sanitation facility
+fn_gen_ph_sani_improve <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_SANI.R
+  x<- x %>% 
+    mutate(ph_sani_type = hv205) %>%
+    mutate(ph_sani_type = case_when(
+      is.na(ph_sani_type) ~ 99,
+      TRUE ~ ph_sani_type)) %>%
+    mutate(ph_sani_improve = case_when(
+            ph_sani_type %in% c(11, 12, 13, 15, 21, 22, 41, 51) ~ 1, # improved sanitation
+            ph_sani_type %in% c(14, 23, 42, 43, 96) ~ 0, # unimproved sanitation
+            ph_sani_type ==31 ~ 0, # open defecation
+            ph_sani_type ==99 ~ NA)) 
+  
+  return(x)
+}
+
+# //Basic handwashing facility
+# had to remove "hv102" condition because using HR and not PR dataset
+fn_gen_ph_hndwsh_basic <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_HNDWSH.R
+  x <-  x %>%
+    mutate(ph_hndwsh_basic = 
+             case_when(
+               hv230b==1 & hv232==1 ~ 1,
+               hv230a<=3 ~ 0))
+    # mutate(ph_hndwsh_basic = 
+    #          case_when(
+    #            hv230b==1 & hv232==1 & hv102==1 ~ 1,
+    #            hv230a<=3 & hv102==1 ~ 0))
+  
+  return(x)
+  
+}
+
+
+# HR variables - missing ------------------------------------------------------------
+
+# Two indicators which I'm not sure exactly how they match DHS data:
+## Households with iodized salt
+## Salt iodization test above 15ppm
+# However, both are missing in the BD2022DHS so can't check.
+
+# //Households with salt tested for iodine content
+# Percentage of households with salt tested for iodine content
+# denominator: all households
+# CN_IODZ_H_SLT
+fn_gen_nt_salt_iod <- function(x){
+  
+  # altered the code to include all households in denominator
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap11_NT/NT_SALT.R
+  x <- x %>%
+    mutate(nt_salt_iod =
+             case_when(
+               hv234a ==1  ~ 1 ,
+               TRUE ~ 0))
+  
+  return(x)
+  
+}
+
+# //Households with iodized salt
+# Percentage of households with iodized salt
+# denominator: all households with tested salt
+# CN_IODZ_H_IOD
+fn_gen_nt_salt_15ppm <- function(x){
+  
+  # came up with this code
+  x <- x %>%
+    mutate(nt_salt_15ppm = case_when(
+      hv234 %in% c(15, 30) ~ 1, # 15 ppm and above, 30 ppm
+      hv234 %in% c(0, 7) ~ 0, # 0 ppm (no iodine), below 15 ppm
+      TRUE ~ NA
+    ))
+  
+  return(x)
+  
+}
+
+# //basic water source
+# Percentage of households with basic water service, defined as an improved water source with either water on the premises or round-trip collection time is 30 minutes or less.
+fn_gen_ph_wtr_basic <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap16_WS/DHS8/WS_WATER.R
+  x <- x  %>% 
+    mutate(ph_wtr_source = case_when( 
+      hv201==14 ~ 13,
+      TRUE ~ hv201
+    )) %>% 
+    mutate(ph_wtr_time = case_when(
+      hv204 %in% c(0, 996) ~ 0,
+      between(hv204, 1, 30) ~ 1,
+      between(hv204, 31,900) ~ 2,
+      hv204>=998 ~ 3)) %>%
+    mutate(ph_wtr_improve = case_when(
+      ph_wtr_source %in% c(11, 12, 13, 14, 15, 21, 31, 41, 51, 61, 62, 65, 71, 72, 73) ~ 1,
+      ph_wtr_source %in% c(30, 32, 40, 42, 43, 96) ~ 0,
+      ph_wtr_source==99 ~ 99)) %>%
+    mutate(ph_wtr_basic = case_when(
+      ph_wtr_improve==1 & ph_wtr_time<=1 ~ 1, # basic
+      ph_wtr_improve==1 & ph_wtr_time>1 ~ 0,  # limited
+      ph_wtr_improve==0 ~ 0))  # unimproved
+  
+  return(x)
+  
+}
