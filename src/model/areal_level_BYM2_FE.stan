@@ -34,7 +34,9 @@ data{
     array[NS] int<lower=0> k; //number of respondants in each area, at admin2 level 
     
     int<lower=1> D;
-    matrix[NS, D] X; // covariates
+    //matrix[NS, D] X; // covariates // Hallie: made this edit after new fixed effects models for districts with missing data weren't working (ch_diar_ors)
+    matrix[N, D] X; // covariates
+    
     
     int<lower=1> N_edges ; 
     array[N_edges] int<lower=1, upper=N> node1 ;
