@@ -11,14 +11,17 @@ library(srvyr)
 #' Inputs
 source("./src/util.R")
 dhs <- read.csv("./gen/prepare-dhs/output/dat-birth.csv")
+ind_info <- read_excel("./data/ind-info.xlsx")
 ################################################################################
 
 # SET DHS INDICATOR CODES
+dhs_codes <- ind_info %>%
+  filter(status == "include" & dhs_dataset == "br") %>%
+  select(dhs_indicator_code, variable)
+# dhs_codes <- data.frame(dhs_indicator_code = c("RH_DELP_C_DHF", "RH_DELA_C_SKP"),
+#                         variable = c("rh_del_inst", "rh_del_pvskill"))
 
-dhs_codes <- data.frame(dhs_indicator_code = c("RH_DELP_C_DHF", "RH_DELA_C_SKP"),
-                        variable = c("rh_del_inst", "rh_del_pvskill"))
-
-# adm2 --------------------------------------------------------------------
+# adm2 naive --------------------------------------------------------------------
 
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
@@ -34,12 +37,23 @@ naive_var <- dhs %>%
             rh_del_pvskill = mean(rh_del_pvskill, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
+# tabulate number of observations (weighted and unweighted)
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  myvar <- dhs_codes$variable[i]
+  df_crosstab <- dhs %>%
+    group_by(ADM2_EN) %>%
+    filter(!is.na(get(myvar))) %>%
+    summarise(obs_un = n(),
+              obs_wn = sum(wt)) %>%
+    mutate(variable = myvar)
+  obs_n <- rbind(obs_n, df_crosstab)
+}
+
+# adm2 direct -------------------------------------------------------------
+
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM2 LEVEL
 
-# dhs_svy <- dhs %>% as_survey_design(ids = c("v001", "v002"), # cluster, household
-#                                     strata = "region_name", # division
-#                                     weights = "wt",
-#                                     nest = TRUE)
 dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
                                     strata = "v023", # strata for sampling
                                     weights = "wt",
@@ -62,21 +76,18 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001), # clusters v001? households v002? individuals?
-            degf = n_obs - 1,
-            sum_wgt = sum(wt))
+  summarise(degf = n_distinct(v001) - 1)
 
 # MERGE
-
 est_adm2 <- dhs_codes %>%
   left_join(naive, by = c("variable")) %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dir, by = c("ADM2_EN", "variable")) %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(obs_n, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
 # adm1 --------------------------------------------------------------------
-
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
 

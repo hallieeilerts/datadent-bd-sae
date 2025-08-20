@@ -32,7 +32,6 @@ dhs_codes <- ind_info %>%
 
 # adm2 naive --------------------------------------------------------------------
 
-
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
 
 naive <- dhs %>% 
@@ -42,7 +41,9 @@ naive <- dhs %>%
             nt_ebf = mean(nt_ebf, na.rm = TRUE),
             nt_ch_micro_mp = mean(nt_ch_micro_mp, na.rm = TRUE),
             ch_diar_zinc = mean(ch_diar_zinc, na.rm = TRUE),
-            ch_diar_ors = mean(ch_diar_ors, na.rm = TRUE)) %>%
+            ch_diar_ors = mean(ch_diar_ors, na.rm = TRUE),
+            ch_allvac_either = mean(ch_allvac_either, na.rm = TRUE),
+            nt_ch_gwmt_any = mean(nt_ch_gwmt_any, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
 naive_var <- dhs %>% 
@@ -52,8 +53,23 @@ naive_var <- dhs %>%
             nt_ebf = var(nt_ebf, na.rm = TRUE),
             nt_ch_micro_mp = var(nt_ch_micro_mp, na.rm = TRUE),
             ch_diar_zinc = var(ch_diar_zinc, na.rm = TRUE),
-            ch_diar_ors = var(ch_diar_ors, na.rm = TRUE)) %>%
+            ch_diar_ors = var(ch_diar_ors, na.rm = TRUE),
+            ch_allvac_either = var(ch_allvac_either, na.rm = TRUE),
+            nt_ch_gwmt_any = var(nt_ch_gwmt_any, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
+
+# tabulate number of observations (weighted and unweighted)
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  myvar <- dhs_codes$variable[i]
+  df_crosstab <- dhs %>%
+    group_by(ADM2_EN) %>%
+    filter(!is.na(get(myvar))) %>%
+    summarise(obs_un = n(),
+              obs_wn = sum(wt)) %>%
+    mutate(variable = myvar)
+  obs_n <- rbind(obs_n, df_crosstab)
+}
 
 
 # adm2 direct for plot ----------------------------------------------------
@@ -78,7 +94,9 @@ dir <- dhs_svy %>%
             nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"),
             nt_ch_micro_mp = survey_mean(nt_ch_micro_mp, na.rm = TRUE, vartype = "var"),
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
-            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"))
+            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
+            ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var"))
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM2_EN", v_var)]
@@ -92,9 +110,7 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
-            degf = n_obs - 1,
-            sum_wgt = sum(wt))
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 # MERGE
 
@@ -103,6 +119,7 @@ est_adm2_forplot <- dhs_codes %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
   left_join(dir, by = c("ADM2_EN", "variable")) %>%
   left_join(dir_var, by = c("ADM2_EN", "variable")) %>%
+  left_join(obs_n, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
 # If naive and naive_var are NA, this means there were no non-missing observations in the adm2 unit
@@ -286,14 +303,13 @@ df_res <- df_res[order(df_res$variable, df_res$ADM2_EN),]
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
-            degf = n_obs - 1,
-            sum_wgt = sum(wt))
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 est_adm2 <- dhs_codes %>%
   left_join(naive, by = c("variable")) %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
   left_join(df_res, by = c("ADM2_EN", "variable")) %>%
+  left_join(obs_n, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
 #View(subset(est_adm2, variable == "nt_ebf" & ADM2_EN %in% c("Meherpur", "Narail")))
@@ -315,7 +331,9 @@ dir <- dhs_svy %>%
             nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"),
             nt_ch_micro_mp = survey_mean(nt_ch_micro_mp, na.rm = TRUE, vartype = "var"),
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
-            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var")) 
+            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
+            ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM1_EN", v_var)]
@@ -346,7 +364,9 @@ dir <- dhs_svy %>%
             nt_ebf = survey_mean(nt_ebf, na.rm = TRUE, vartype = "var"),
             nt_ch_micro_mp = survey_mean(nt_ch_micro_mp, na.rm = TRUE, vartype = "var"),
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
-            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var")) 
+            ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
+            ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[, v_var]
