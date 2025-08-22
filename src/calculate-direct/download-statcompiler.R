@@ -60,7 +60,9 @@ all_dat_samp <- all_dat %>%
   filter(!(dhs_indicator_code == "RH_ANCS_W_WGT" & (ByVariableLabel != "Three years preceding the survey" |
             dhs_indicator_description != "Antenatal care content (of ANC): Weight measured"))) %>% 
   filter(!(dhs_indicator_code == "RH_DELA_C_SKP" & ByVariableLabel != "Three years preceding the survey")) %>%
-  filter(!(dhs_indicator_code == "RH_DELP_C_DHF" & ByVariableLabel != "Three years preceding the survey"))
+  filter(!(dhs_indicator_code == "RH_DELP_C_DHF" & ByVariableLabel != "Three years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "RH_ANCC_W_IRN" & ByVariableLabel == "Two years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "RH_ANCT_W_TL4" & ByVariableLabel == "Two years preceding the survey"))
 all_dat_samp %>%
   group_by(dhs_indicator_code) %>%
   summarise(n = n()) %>% filter(n > 1)

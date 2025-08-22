@@ -5,6 +5,9 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(tidyr)
+library(dplyr)
+library(ggplot2)
 #' Inputs
 source("./src/util.R")
 # Manually calculated indicators
@@ -33,8 +36,9 @@ datLong <- data %>%
 p1 <- datLong %>%
   ggplot() +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
-  facet_wrap(~variable) 
-ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare3.pdf"), p1, height = 10, width = 8, units = "in") 
+  facet_wrap(~variable) +
+  theme(text = element_text(size = 10))
+ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare6.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
 
