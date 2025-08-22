@@ -76,7 +76,8 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(degf = n_distinct(v001) - 1)
+  summarise(n_obs = n_distinct(v001),
+            degf = n_obs - 1)
 
 # MERGE
 est_adm2 <- dhs_codes %>%

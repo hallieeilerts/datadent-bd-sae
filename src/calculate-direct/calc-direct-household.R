@@ -93,7 +93,8 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(degf = n_distinct(hv001) - 1) # clusters v001? households v002? individuals?
+  summarise(n_obs = n_distinct(hv001),
+            degf = n_obs - 1) # clusters v001? households v002? individuals?
 
 # MERGE
 

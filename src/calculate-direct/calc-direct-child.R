@@ -110,7 +110,8 @@ dir_var <- dir_var %>%
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
+  summarise(n_obs = n_distinct(v001),
+            degf = n_obs - 1) # psu/clusters v001? households v002?
 
 # MERGE
 
@@ -303,7 +304,8 @@ df_res <- df_res[order(df_res$variable, df_res$ADM2_EN),]
 # calculate degrees of freedom
 dhs_degf <- dhs %>%
   group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
+  summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
+            degf = n_obs - 1) 
 
 est_adm2 <- dhs_codes %>%
   left_join(naive, by = c("variable")) %>%
