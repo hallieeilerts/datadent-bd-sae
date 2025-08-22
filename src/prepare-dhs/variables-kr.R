@@ -52,14 +52,16 @@ dat_var <- fn_gen_nt_mdd(dat_var)
 dat_var <- fn_gen_nt_ch_micro_mp(dat_var)
 dat_var <- fn_gen_ch_diar_zinc(dat_var)
 dat_var <- fn_gen_ch_diar_ors(dat_var)
-#dat_var <- fn_gen_ch_meas_either(dat_var)
-#dat_var <- fn_gen_ch_rotav3_either(dat_var)
-#dat_var <- fn_gen_ch_pent3_either(dat_var)
-#dat_var <- fn_gen_nt_ch_micro_iod(dat_var)
+#dat_var <- fn_gen_nt_ch_micro_iron(dat_var) # wrong retrospective period
+#dat_var <- fn_gen_nt_mdd(dat_var)           # not needed
+#dat_var <- fn_gen_ch_meas_either(dat_var) # missing
+#dat_var <- fn_gen_ch_rotav3_either(dat_var) # missing
+#dat_var <- fn_gen_ch_pent3_either(dat_var) # missing
+#dat_var <- fn_gen_nt_ch_micro_iod(dat_var) # missing
 
 dat_var <- dat_var %>%
   select(ADM2_EN, ADM1_EN, bidx, v001, v002, v003, v008, v023, v024, v025, b3, b16, 
-         nt_ch_micro_vas, nt_ch_micro_dwm, nt_ebf, nt_mdd,
+         nt_ch_micro_vas, nt_ch_micro_dwm, nt_ebf, 
          nt_ch_micro_mp, ch_diar_zinc, ch_diar_ors, wt) %>%
   mutate(region_name = as.character(as_factor(v024)),
          residence = as.character(as_factor(v025)),
