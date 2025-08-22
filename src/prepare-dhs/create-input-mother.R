@@ -9,15 +9,28 @@ rm(list = ls())
 source("./src/util.R")
 ir <- readRDS("./gen/prepare-dhs/temp/variables-ir.rds")
 hr <- readRDS("./gen/prepare-dhs/temp/variables-hr.rds")
+ir2014 <- readRDS("./gen/prepare-dhs/temp/variables-ir-2014.rds")
+hr2014 <- readRDS("./gen/prepare-dhs/temp/variables-hr-2014.rds")
 ################################################################################
 
 # only keep identifiers and covariates from household file (no covariates in child and births files)
 hhd_covar <- hr %>%
-  select(hv001, hv002, hhd_mem, hhd_under5, hhd_head_sex, hhd_head_age, wealth_index)
+  dplyr::select(hv001, hv002, hhd_mem, hhd_under5, hhd_head_sex, hhd_head_age, wealth_index)
 
 # merge
 dat <- ir %>%
   left_join(hhd_covar, by = c("v001" = "hv001", "v002" = "hv002"))
+
+hhd_covar2014 <- hr2014 %>%
+  dplyr::select(hv001, hv002, hhd_mem, hhd_under5, hhd_head_sex, hhd_head_age, wealth_index)
+dat2014 <- ir2014 %>%
+  left_join(hhd_covar2014, by = c("v001" = "hv001", "v002" = "hv002"))
+
+# combine 2022 and 2017
+# convert v23 factors to character and rbind
+dat$v023 <- as.character(dat$v023)
+dat2014$v023 <- as.character(dat2014$v023)
+dat <- bind_rows(dat, dat2014)
 
 # Save --------------------------------------------------------------------
 
