@@ -32,7 +32,7 @@ if(sum(grepl("model-info", audit_files)) > 0){
 
 # set model
 vers <- "100" 
-test <- "Test2"
+test <- "Test1"
 model_name <- "ArealBYM2"
 model_file <- "areal_level_BYM2_intercept.stan"
 
@@ -72,9 +72,9 @@ for(i in 1:length(v_var)){
   
   ### removing all districts with only one cluster
   ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
-  if(nrow(ind_dist) != nrow(ind_dist_complete)){
-    stop("district removed")
-  }
+  #if(nrow(ind_dist) != nrow(ind_dist_complete)){
+  #  stop("district removed")
+  #}
   
   # Compile model
   mod <- cmdstan_model(stanfile)
@@ -283,9 +283,9 @@ for(i in 1:length(v_var)){
   df_quantile =  apply(df_p[,1:nrow(postpred)], 2 , quantile , probs = c(alpha/2,1-alpha/2) , na.rm = TRUE ) |> t()
   postpred$qt_lb <- df_quantile[, 1]
   postpred$qt_ub <- df_quantile[, 2]
-  postpred$naive <- postpred$naive * 100
-  postpred$dir <- postpred$dir * 100
-  postpred$post_mean <- postpred$post_mean * 100
+  # postpred$naive <- postpred$naive * 100
+  # postpred$dir <- postpred$dir * 100
+  # postpred$post_mean <- postpred$post_mean * 100
   
   # save posterior predictions
   write.csv(postpred, paste0("./gen/model/pred/", paste0("pred-", file_name), ".csv"), row.names = FALSE)
