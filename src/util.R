@@ -108,7 +108,7 @@ prepare_bym2 <- function(adj_mat) {
 
 # Validation helper functions ---------------------------------------------
 
-check_overlap<- function(xmin, xmax, ymin, ymax) {
+check_overlap <- function(xmin, xmax, ymin, ymax) {
   # Ensure inputs are vectors of the same length
   if (length(xmin) != length(xmax) || length(ymin) != length(ymax)) {
     stop("Input vectors must have the same length.")
@@ -218,22 +218,6 @@ fn_gen_nt_ebf <- function(x){
   return(x)
 }
 
-
-# //Mothers who received IYCF counseling in the last 6 months - NEW Indicator in DHS8
-fn_gen_nt_counsel_iycf	<- function(x){
-  
-  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
-  x$age_months <- x$v008 - x$b3
-  x$nt_counsel_iycf <- 0
-  x$nt_counsel_iycf[(x$v486 == 1)] <- 1
-  x$nt_counsel_iycf[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
-  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 0] <- 0
-  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 1] <- 1
-  
-  return(x)
-  
-}
-
 # //Child with minimum dietary diversity- last-born 6-23 months
 # v414, v411, v410, v412, v413, v000, m4
 fn_gen_nt_mdd	<- function(x){
@@ -329,7 +313,7 @@ fn_gen_ch_diar_zinc <- function(x){
   
 }
 
-# //Given zinc for diarrhea
+# //Given ORS for diarrhea
 # Percentage of children born in the five (or three) years preceding the survey with diarrhea in the two weeks preceding the survey who received oral rehydration solution (ORS), that is either fluid from an ORS packet or a pre-packaged ORS fluid
 fn_gen_ch_diar_ors <- function(x){
   
@@ -349,7 +333,92 @@ fn_gen_ch_diar_ors <- function(x){
   
 }
 
+# //All basic vaccinations according to either source
+# BD2017DHS
+# https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap10_CH/CH_VAC.R
+fn_gen_ch_allvac_either <- function(x){
+  
+  x <- x %>%
+    mutate(age_months = b19) %>%
+    mutate(agegroup = 
+             case_when(
+               age_months >=12 & age_months <=23 ~ 1,
+               age_months >=24 & age_months <=35 ~ 2)) %>%
+    filter(agegroup==1 & b5==1) %>% # select age group and live children 
+    mutate(ch_bcg_either = case_when(h2%in%c(1,2,3) ~ 1, h2%in%c(0,8) ~ 0  )) %>%
+    mutate(dpt1 = case_when(h3%in%c(1,2,3) ~ 1, h3%in%c(0,8) ~ 0  )) %>%
+    mutate(dpt2 = case_when(h5%in%c(1,2,3) ~ 1, h5%in%c(0,8) ~ 0  )) %>%
+    mutate(dpt3 = case_when(h7%in%c(1,2,3) ~ 1, h7%in%c(0,8) ~ 0  )) %>%
+    mutate(dptsum = dpt1 + dpt2 + dpt3) %>%
+    mutate(ch_pent3_either = case_when(dptsum >=3 ~ 1, TRUE ~ 0  )) %>%
+    mutate(polio1 = case_when(h4%in%c(1,2,3) ~ 1, h4%in%c(0,8) ~ 0  )) %>%
+    mutate(polio2 = case_when(h6%in%c(1,2,3) ~ 1, h6%in%c(0,8) ~ 0  )) %>%
+    mutate(polio3 = case_when(h8%in%c(1,2,3) ~ 1, h8%in%c(0,8) ~ 0  )) %>%
+    mutate(poliosum=polio1 + polio2 + polio3) %>%
+    mutate(ch_polio3_either = case_when(poliosum >=3 ~ 1, TRUE ~ 0  )) %>%
+    mutate(ch_meas_either = 
+             case_when(h9%in%c(1,2,3) ~ 1, h9%in%c(0,8)   ~ 0  )) %>%
+    mutate(ch_allvac_either = 
+           case_when(ch_bcg_either == 1 & ch_pent3_either == 1 & ch_polio3_either == 1 & ch_meas_either == 1 ~ 1, 
+                     TRUE ~ 0)) 
+  
+  return(x)
+  
+}
+
+# Children 0-59m who had their growth monitored (previous 3 months)
+# BD2017DHS
+# https://dhsprogram.com/Data/Guide-to-DHS-Statistics/Child_Growth_Monitoring.htm
+# Couldn't find code on DHS github, came up with code on my own. This doesn't work for 2017 which is DHS-7, not DHS-8.
+# fn_gen_nt_ch_gwmt_any <- function(x){
+#   
+#   x <- x %>%
+#     mutate(age_months = b19) %>%
+#     mutate(nt_ch_gwmt_any =
+#              case_when(
+#                age_months >59 | b5==0 ~ 99, # ineligible if older than 59m or not alive
+#                h70a==1|h70b==1|h70c==1 ~ 1,
+#                (h70a!=1 & h70b!=1 & h70c != 1) ~ 0)) %>%
+#     replace_with_na(replace = list(nt_ch_gwmt_any = c(99))) 
+#   
+#   
+#   return(x)
+#   
+# }
+fn_gen_nt_ch_gwmt_any <- function(x){
+  
+  x <- x %>%
+    mutate(age_months = b19) %>%
+    mutate(nt_ch_gwmt_any =
+             case_when(
+               age_months >59 | b5==0 ~ 99, # ineligible if older than 59m or not alive
+               s321c == 1 ~ 1,
+               s321c != 1 ~ 0)) %>%
+    replace_with_na(replace = list(nt_ch_gwmt_any = c(99))) 
+  
+  
+  return(x)
+  
+}
+
+
+
 # KR variables - missing --------------------------------------------------
+
+# //Mothers who received IYCF counseling in the last 6 months - NEW Indicator in DHS8
+fn_gen_nt_counsel_iycf	<- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_CH_MICRO.R
+  x$age_months <- x$v008 - x$b3
+  x$nt_counsel_iycf <- 0
+  x$nt_counsel_iycf[(x$v486 == 1)] <- 1
+  x$nt_counsel_iycf[(x$age_months <6 | x$age_months > 59 | x$b5 <= 0)] <- NA
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 0] <- 0
+  x$nt_counsel_iycf[!is.na(x$nt_counsel_iycf) & x$nt_counsel_iycf == 1] <- 1
+  
+  return(x)
+  
+}
 
 # BD 2022 doesn't have
 # //Pentavalent 3rd dose vaccination according to either source
@@ -612,11 +681,7 @@ fn_gen_rh_anc_1tri	<- function(x){
   return(x)
 }
 
-# // Weighed during pregnancy
-# Care given during the last antenatal visit for the pregnancy
-# BASE: For M42A to M42E is women who had seen someone for antenatal care for their last born child (MIDX = 1 & M2N <> 1).
-# M2A-N: The type of person who gave prenatal care to the respondent prior to the last birth. A value of M2N would mean no one.
-# m42a_1, m42_2, m42a_3, m42a_4, m42a_5, m42a_6
+
 
 
 #fn_gen_fp_cusm_w_mod <- function(x){}
@@ -671,6 +736,11 @@ fn_gen_rh_anc_bldsamp <- function(x){
 }
 
 # //Weighed during pregnancy
+# // Weighed during pregnancy
+# Care given during the last antenatal visit for the pregnancy
+# BASE: For M42A to M42E is women who had seen someone for antenatal care for their last born child (MIDX = 1 & M2N <> 1).
+# M2A-N: The type of person who gave prenatal care to the respondent prior to the last birth. A value of M2N would mean no one.
+# m42a_1, m42_2, m42a_3, m42a_4, m42a_5, m42a_6
 fn_gen_rh_anc_wgt <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
@@ -687,15 +757,34 @@ fn_gen_rh_anc_wgt <- function(x){
 }
 
 # //Took iron tablet/syrup during the pregnancy of last birth
+# fn_gen_rh_anc_iron <- function(x){
+# 
+#   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+#   x <- x %>%
+#     mutate(period = 60,
+#            age = b19_01) %>%
+#     mutate(rh_anc_iron =
+#              case_when(
+#                m45_1 == 1 ~ 1 ,
+#                v208 == 0 | age>=period ~ 99, # if no births reported or birth was more than 5 years ago
+#                TRUE ~ 0)) %>%
+#     replace_with_na(replace = list(rh_anc_iron = c(99)))
+# 
+#   return(x)
+# }
 fn_gen_rh_anc_iron <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(ancany =
+             case_when(
+               m14_1 %in% c(0,99)   ~ 0 ,
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
     mutate(rh_anc_iron =
              case_when(
-               m45_1 == 1 ~ 1 ,
-               v208 ==0 | age>=period ~ 99,
-               TRUE ~ 0))
+               m45_1 == 1 & ancany==1 ~ 1  ,
+               ancany==1 ~ 0 ))
+  
   return(x)
 }
 
@@ -838,6 +927,25 @@ fn_gen_rh_pnc_wm_bfcounsel <- function(x){
   return(x)
 }
 
+
+# Women with a birth in the past five years who received a vitamin A dose in the first two months after delivery
+# BD2014
+# Couldn't find code on DHS github, came up with code on my own
+fn_gen_nt_wm_ppvita <- function(x){
+  
+  x <- x %>%
+    mutate(age = v008-b3_01) %>% # age of child
+    mutate(nt_wm_ppvita =
+             case_when(
+               m54_1 == 1 & age < 60 ~ 1,
+               m54_1 == 0 & age < 60 ~ 0,
+               TRUE ~ NA
+             ))
+  
+  return(x)
+}
+
+
 # IR variables - missing --------------------------------------------------
 
 # //Breastfeeding counseling during pregnancy
@@ -864,6 +972,7 @@ fn_gen_nt_wm_micro_iod <- function(x){
   
   return(x)
 }
+
 
 
 # HR variables ------------------------------------------------------------
