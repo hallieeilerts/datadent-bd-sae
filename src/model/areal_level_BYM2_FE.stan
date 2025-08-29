@@ -23,6 +23,15 @@ functions {
       real d = -log(2) - 1.5 * log(prec) + log(lambda) - lambda * s ;
       return d;
     }
+    
+   // penalized complexity prior defined for standard deviation, rather than precision parameter.
+   real pcsd_lpdf(real sigma, real u, real alpha) {
+     real lambda = -log(alpha) / u;
+     if (sigma <= 0) return negative_infinity();
+     return log(lambda) - lambda * sigma;
+  }
+    
+    
 }
 data{
     int<lower=1> N; // number of admn2 areas
@@ -30,6 +39,7 @@ data{
     array[NS] int<lower=1,upper=N> adm2_index; //index
     array[NS] real<lower=0, upper =1> p_hat; // direct estimate of prevalence
     array[NS] real<lower=0> v_hat; // direct estimate of variance
+    vector[NS] v_floor; //new
     array[NS] real<lower=0> d; // degree of freedom in each area, at admin2 level ; 
     array[NS] int<lower=0> k; //number of respondants in each area, at admin2 level 
     
@@ -66,8 +76,16 @@ parameters{
 transformed parameters {
     vector[N] u = (sigma_u)*(sqrt(rho/scaling_factor) * (u1) + sqrt(1-rho) * (u2));
     vector[N] p = inv_logit(b0 + X*beta + u);
-    vector[NS] v = exp(gamma0 + gamma1*log(p[adm2_index].*(1-p[adm2_index])) + gamma2*log(to_vector(k)) + square(sigma_tau)*tau);
-    vector[NS] scaled_vhat= d_vhat./v;
+    //vector[NS] v = exp(gamma0 + gamma1*log(p[adm2_index].*(1-p[adm2_index])) + gamma2*log(to_vector(k)) + square(sigma_tau)*tau);
+    //vector[NS] scaled_vhat= d_vhat./v;
+    
+    // adding floor to variance
+    vector[NS] logv = gamma0 + gamma1 * log(p[adm2_index] .* (1 - p[adm2_index])) + gamma2 * log(to_vector(k)) + sigma_tau * tau;
+    vector[NS] v_unfloored = exp(logv);
+    vector[NS] v;
+    for (i in 1:NS) v[i] = fmax(v_unfloored[i], v_floor[i]);
+    vector[NS] scaled_vhat = to_vector(d) .* (to_vector(v_hat) + v_floor) ./ v;
+    
 }
 model{
     // likelihood
@@ -76,14 +94,16 @@ model{
     // mean model prior
     target += icar_normal_lpdf(u1|N, node1,node2); 
     target += normal_lpdf(u2|0,1);   
-    target += pcprec_lpdf(sigma_u|1, 0.01); // this is penalised complexity instead of target += normal_lpdf(sigma_u|0,1); // 
+    target += pcprec_lpdf(sigma_u|1, 0.01); // penalised complexity instead of target += normal_lpdf(sigma_u|0,1); //
+    //target += pcsd_lpdf(sigma_u | 1, 0.01); // could replace the above. pcp defined for sd
     target += beta_lpdf(rho| 0.5,0.5); 
     target += normal_lpdf(b0| 0, 5);
     target += normal_lpdf(beta| 0, 5);
     // var model prior
     target += normal_lpdf(tau|0,1); //instead of target += normal_lpdf(log(v)|f, sigma_tau); // (from paper)
-    target += pcprec_lpdf(sigma_tau|1, 0.01); //  this is penalised complexity instead of target += normal_lpdf(sigma_tau|0,1); 
-    target += normal_lpdf(gamma0|0,1);
+    target += pcprec_lpdf(sigma_tau|1, 0.01); // penalised complexity instead of target += normal_lpdf(sigma_tau|0,1);
+    //target += pcsd_lpdf(sigma_tau | 0.5, 0.05); // could replace the above. pcp defined for sd
+    target += normal_lpdf(gamma0|0, 1);
     target += normal_lpdf(gamma1|1,0.5);
     target += normal_lpdf(gamma2|-1, 0.5);
 }
