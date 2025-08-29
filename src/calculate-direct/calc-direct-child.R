@@ -18,17 +18,6 @@ ind_info <- read_excel("./data/ind-info.xlsx")
 dhs_codes <- ind_info %>%
   filter(status == "include" & dhs_dataset == "kr") %>%
   select(dhs_indicator_code, variable)
-# dhs_codes <- data.frame(dhs_indicator_code = c("CN_MIAC_C_VAS", "CN_MIAC_C_DWM", "CN_BFSS_C_EBF", "CN_MIAC_C_MMN",
-#                                                "CH_DIAT_C_ZNC", "CH_DIAT_C_ORS"),
-#                         variable = c("nt_ch_micro_vas", "nt_ch_micro_dwm", "nt_ebf", "nt_ch_micro_mp",
-#                                      "ch_diar_zinc", "ch_diar_ors"))
-
-# Not in survey
-# nt_counsel_iycf CN_IYCC_W_COU
-# ch_rotav3_either CH_VACC_C_RT2
-# ch_meas_either CH_VACC_C_MSL
-# ch_pent3_either CH_VACC_C_PT3
-# nt_ch_micro_iod CN_MIAC_C_IOD
 
 # adm2 naive --------------------------------------------------------------------
 
@@ -57,19 +46,6 @@ naive_var <- dhs %>%
             ch_allvac_either = var(ch_allvac_either, na.rm = TRUE),
             nt_ch_gwmt_any = var(nt_ch_gwmt_any, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
-
-# tabulate number of observations (weighted and unweighted)
-obs_n <- data.frame()
-for(i in 1:length(dhs_codes$variable)){
-  myvar <- dhs_codes$variable[i]
-  df_crosstab <- dhs %>%
-    group_by(ADM2_EN) %>%
-    filter(!is.na(get(myvar))) %>%
-    summarise(obs_un = n(),
-              obs_wn = sum(wt)) %>%
-    mutate(variable = myvar)
-  obs_n <- rbind(obs_n, df_crosstab)
-}
 
 
 # adm2 direct for plot ----------------------------------------------------
@@ -107,9 +83,42 @@ dir <- dir %>%
 dir_var <- dir_var %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
 
-# calculate degrees of freedom
+# by indicator and adm2, tabulate the number of non-missing observations (weighted and unweighted)
+# then tabulate averages observations for adm1
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  
+  myvar <- dhs_codes$variable[i]
+  
+  # # this one doesn't work when district has zero observations. gets dropped
+  # df_crosstab <- dhs %>%
+  #   group_by(ADM1_EN, ADM2_EN) %>%
+  #   filter(!is.na(get(myvar))) %>%
+  #   summarise(obs_un = n(),
+  #             obs_wn = sum(wt)) %>%
+  #   group_by(ADM1_EN) %>%
+  #   mutate(obs_un_adm1_avg = mean(obs_un, na.rm = TRUE),
+  #          obs_wn_adm1_avg = mean(obs_wn, na.rm = TRUE),
+  #           variable = myvar)
+  
+  df_crosstab <- dhs %>%
+    group_by(ADM1_EN, ADM2_EN) %>%
+    mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
+           obs_wt = ifelse(!is.na(get(myvar)), wt, 0)) %>%
+    summarise(obs_un = sum(obs_ind),
+              obs_wn = sum(obs_wt)) %>%
+    group_by(ADM1_EN) %>%
+    mutate(obs_un_adm1_avg = mean(obs_un, na.rm = TRUE),
+           obs_wn_adm1_avg = mean(obs_wn, na.rm = TRUE),
+           variable = myvar)
+  
+  obs_n <- rbind(obs_n, df_crosstab)
+  
+}
+
+# by district, calculate number of clusters and degrees of freedom
 dhs_degf <- dhs %>%
-  group_by(ADM1_EN, ADM2_EN) %>%
+  group_by(ADM2_EN) %>%
   summarise(n_obs = n_distinct(v001),
             degf = n_obs - 1) # psu/clusters v001? households v002?
 
@@ -127,6 +136,107 @@ est_adm2_forplot <- dhs_codes %>%
 # recode dir and dir_var to NA so that it is not plotted
 est_adm2_forplot$dir[is.na(est_adm2_forplot$naive)] <- NA
 est_adm2_forplot$dir_var[is.na(est_adm2_forplot$naive_var)] <- NA
+
+# adm2 phantom household --------------------------------------------------
+
+##########################################################
+# UNDER CONSTRUCTION TO REPLACE "adm2 direct for modeling" SYNTHETIC HOUSEHOLD METHOD BELOW
+##########################################################
+
+
+# vector of variables
+v_var <- unique(naive$variable)
+
+myvar <- v_var[i]
+# Grab the variable name as a symbol
+var_sym <- sym(v_var[i])
+
+# df_aggregates should have naive, naive_var, design_based_mean, design_based_var, n (number of clusters), degf (cluster minus 1)
+df_aggregates <- est_adm2_forplot %>% filter(variable %in% myvar)
+
+# calculate cluster level variance
+df_cluster_level <- dhs %>% 
+  filter(variable %in% myvar) %>%
+  group_by(ADM2_EN, v001, v023) %>%
+  summarise(cluster_mean = mean(.data[[var_sym]], na.rm = TRUE),
+            cluster_count = sum(.data[[var_sym ]], na.rm = TRUE),
+            cluster_weight = sum(wt),
+            n_hh = n(),
+            n = sum(!is.na(.data[[var_sym]]))
+  ) %>% 
+  ungroup() %>%
+  mutate(ea = as.character(v001),
+         strata_name = paste(.data[[strata[1]]],.data[[strata[2]]], sep = "_")
+  )
+# df_cluster_level <- df |> 
+#   group_by(pick(unique(c(geo_level_upper, geo_level, strata, "ea")))) |>
+#   summarise(cluster_mean = mean(.data[[nutrient_colname]], na.rm = TRUE),
+#             cluster_count = sum(.data[[nutrient_colname]], na.rm = TRUE),
+#             cluster_weight = sum(survey_wgt),
+#             n_hh = n(),
+#             n = sum(!is.na(.data[[nutrient_colname]]))
+#   ) |> ungroup() |>
+#   mutate(ea = as.character(ea),
+#          strata_name = paste(.data[[strata[1]]],.data[[strata[2]]],sep = "_")
+#   )
+df_cluster_level_original <- df_cluster_level
+
+df_geo_phantom <- df_cluster_level %>%  
+  group_by(pick(unique(c(geo_level_upper, geo_level,strata)))) %>%
+  summarise(n_values = n_distinct(cluster_mean)) %>%
+  filter(n_values == 1) %>%
+  select(all_of(unique(c(geo_level_upper,geo_level,strata)))) %>%
+  mutate(strata_name = paste(.data[[strata[1]]],.data[[strata[2]]], sep = "_"))
+strata_list <- unique(df_geo_phantom[["strata_name"]])
+j = 0
+for(each_stratum in strata_list){
+  
+  geo_phantom_list <- df_geo_phantom[[geo_level]][df_geo_phantom[["strata_name"]]==each_stratum]
+  
+  df_tmp_to_add <- df_cluster_level %>%
+    filter(strata_name == each_stratum) %>%
+    group_by(pick(unique(c(geo_level_upper, strata, "strata_name")))) %>%
+    summarise(cluster_mean = weighted.mean(cluster_mean,cluster_weight,na.rm = TRUE),
+              cluster_weight = sum(cluster_weight, na.rm = TRUE)/sum(n_hh),
+              n_hh = 1
+    )
+  
+  for (each_geo in geo_phantom_list){
+    j = j + 1
+    df_cluster_level <- bind_rows(df_cluster_level,
+                                  (df_tmp_to_add %>%
+                                     mutate(!!geo_level := each_geo,
+                                            ea = paste0("phantom",as.character(j)))
+                                  )
+    )
+  }
+}
+
+# cluster level survey design
+df_cluster_level_svy <- svydesign(
+  ids = ~ea,
+  strata = strata_formula,  
+  weights = ~cluster_weight,
+  data = df_cluster_level,
+  nest = TRUE
+)
+
+df_aggregates_tmp <- svyby(formula = ~cluster_mean, 
+                           by = as.formula(paste("~",geo_level)),
+                           design = df_cluster_level_svy,
+                           FUN = svymean,
+                           na.rm = TRUE,
+                           vartype = "var") |> 
+  rename(design_based_ph_mean = cluster_mean, design_based_ph_var = var) |>
+  left_join(
+    df_cluster_level |> 
+      group_by(pick(geo_level)) |>
+      summarise(degf_ph = n() - 1, n_obs_ph = sum(n_hh))
+  )
+df_aggregates <- df_aggregates |> left_join(df_aggregates_tmp, by = geo_level)
+
+return((list(df_aggregates, df_cluster_level, df_cluster_level_original)))
+
 
 # adm2 direct for modeling ------------------------------------------------
 
@@ -301,12 +411,6 @@ df_res_rest <- do.call(rbind, l_res)
 df_res <- rbind(df_res_rest, df_res_syn)
 df_res <- df_res[order(df_res$variable, df_res$ADM2_EN),]
 
-# calculate degrees of freedom
-dhs_degf <- dhs %>%
-  group_by(ADM1_EN, ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001), # psu/clusters v001? households v002?
-            degf = n_obs - 1) 
-
 est_adm2 <- dhs_codes %>%
   left_join(naive, by = c("variable")) %>%
   left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
@@ -317,7 +421,6 @@ est_adm2 <- dhs_codes %>%
 #View(subset(est_adm2, variable == "nt_ebf" & ADM2_EN %in% c("Meherpur", "Narail")))
 
 # adm1 --------------------------------------------------------------------
-
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
 
@@ -346,9 +449,44 @@ dir <- dir %>%
 dir_var <- dir_var %>%
   pivot_longer(cols = -ADM1_EN, names_to = "variable", values_to = "dir_var")
 
+
+# by indicator and adm1, tabulate the number of non-missing observations (weighted and unweighted)
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  
+  myvar <- dhs_codes$variable[i]
+  
+  # df_crosstab <- dhs %>%
+  #   group_by(ADM1_EN) %>%
+  #   filter(!is.na(get(myvar))) %>%
+  #   summarise(obs_un = n(),
+  #             obs_wn = sum(wt)) %>%
+  #   mutate(variable = myvar)
+  # should do same as above, but has consistent syntax with adm2 approach
+  df_crosstab <- dhs %>%
+    group_by(ADM1_EN) %>%
+    mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
+           obs_wt = ifelse(!is.na(get(myvar)), wt, 0)) %>%
+    summarise(obs_un = sum(obs_ind),
+              obs_wn = sum(obs_wt)) %>%
+    mutate(variable = myvar)
+  
+  
+  obs_n <- rbind(obs_n, df_crosstab)
+  
+}
+
+# by district, calculate number of clusters and degrees of freedom
+dhs_degf <- dhs %>%
+  group_by(ADM1_EN) %>%
+  summarise(n_obs = n_distinct(v001),
+            degf = n_obs - 1)
+
 est_adm1 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
-  left_join(dir_var, by = c("ADM1_EN", "variable"))
+  left_join(dir_var, by = c("ADM1_EN", "variable")) %>%
+  left_join(obs_n, by = c("ADM1_EN", "variable")) %>%
+  left_join(dhs_degf, by = c("ADM1_EN"))
 
 
 # adm0 --------------------------------------------------------------------
@@ -379,9 +517,40 @@ dir <- dir %>%
 dir_var <- dir_var %>%
   pivot_longer(cols = everything(), names_to = "variable", values_to = "dir_var")
   
+# by indicator, tabulate the number of non-missing observations (weighted and unweighted)
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  
+  myvar <- dhs_codes$variable[i]
+  
+  # df_crosstab <- dhs %>%
+  #   filter(!is.na(get(myvar))) %>%
+  #   summarise(obs_un = n(),
+  #             obs_wn = sum(wt)) %>%
+  #   mutate(variable = myvar)
+  # should do same as above, but has consistent syntax with adm2 approach
+  df_crosstab <- dhs %>%
+    mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
+           obs_wt = ifelse(!is.na(get(myvar)), wt, 0)) %>%
+    summarise(obs_un = sum(obs_ind),
+              obs_wn = sum(obs_wt)) %>%
+    mutate(variable = myvar)
+  
+  obs_n <- rbind(obs_n, df_crosstab)
+  
+}
+
+# by district, calculate number of clusters and degrees of freedom
+dhs_degf <- dhs %>%
+  summarise(n_obs = n_distinct(v001),
+            degf = n_obs - 1)
+
 est_adm0 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
-  left_join(dir_var, by = c("variable"))
+  left_join(dir_var, by = c("variable")) %>%
+  left_join(obs_n, by = c("variable")) %>%
+  crossing(dhs_degf)
+
 
 # Save --------------------------------------------------------------------
 

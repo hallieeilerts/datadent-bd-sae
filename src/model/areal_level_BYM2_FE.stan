@@ -17,7 +17,7 @@ functions {
     // define penalized complexity prior here
     real pcprec_lpdf(real prec, real u, real alpha) {
       //penalised complexty prior for precision parameter 
-      // u and alpha to be choose to satisfy p(sigma > u) = alpha where sigma = 1/sqrt(prec)
+      // u and alpha to be choosen to satisfy p(sigma > u) = alpha where sigma = 1/sqrt(prec)
       real lambda = -log(alpha)/u;
       real s = 1/sqrt(prec);
       real d = -log(2) - 1.5 * log(prec) + log(lambda) - lambda * s ;

@@ -35,6 +35,12 @@ direct_child_forplot <- direct_child_forplot %>%
   dplyr::select(variable, ADM2_EN, dirplot, dirplot_var)
 direct_child_m <- merge(direct_child, direct_child_forplot, by = c("variable", "ADM2_EN"))
 direct <- bind_rows(direct_child_m, direct_mother, direct_household, direct_birth)
+# Note: 
+# some estimates will be NA for naive, dir, and dir_plot -- when there were zero observations in the district
+# some will be present for naive and dir, and NA for dir_plot -- this is when a synthetic household adjustment was made for modeling
+# re-arrange columns
+direct <- direct %>%
+  relocate(ADM1_EN, .before = ADM2_EN)
 
 direct_adm1 <- rbind(direct_child_adm1, direct_mother_adm1, direct_household_adm1, direct_birth_adm1)
 direct_adm0 <- rbind(direct_child_adm0, direct_mother_adm0, direct_household_adm0, direct_birth_adm0)
@@ -42,5 +48,5 @@ direct_adm0 <- rbind(direct_child_adm0, direct_mother_adm0, direct_household_adm
 # Save --------------------------------------------------------------------
 
 write.csv(direct, file = "./gen/calculate-direct/output/direct-estimates.csv", row.names = FALSE)
-write.csv(direct_adm1, file = "./gen/calculate-direct/audit/direct-estimates-adm1.csv", row.names = FALSE)
-write.csv(direct_adm0, file = "./gen/calculate-direct/audit/direct-estimates-adm0.csv", row.names = FALSE)
+write.csv(direct_adm1, file = "./gen/calculate-direct/output/direct-estimates-adm1.csv", row.names = FALSE)
+write.csv(direct_adm0, file = "./gen/calculate-direct/output/direct-estimates-adm0.csv", row.names = FALSE)
