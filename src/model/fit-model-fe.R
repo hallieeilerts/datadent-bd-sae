@@ -42,6 +42,9 @@ test <- 1
 model_name <- "ArealBYM2"
 model_file <- "areal_level_BYM2_FE.stan"
 
+# subset to included indicators
+df_ind <- subset(ind, status == "include")
+
 # generate plots?
 make_plots <- FALSE
 
@@ -56,30 +59,28 @@ bangladesh_2$district_id <- 1:nrow(bangladesh_2)
 # set model
 stanfile <- here(paste0("src/model/", model_file))
 # vector of outcomes
-v_var <- unique(est$variable)
+v_var <- unique(df_ind$variable)
 #v_var <- "nt_ch_micro_vas" # works
 #v_var <- "ch_diar_ors" # works
 #v_var <- "ch_diar_zinc" # works 
+#v_var <- "ch_diar_ors"
+#v_var <- unique(subset(df_ind, covar_grp %in% c("ch_trtmnt"))$variable)
 
-# !!!!! Need to run for all others, but first add new indicators and update covariate groupings/decide on top 3 covariates
-#v_var <- v_var[!(v_var %in% c("nt_ch_micro_vas","ch_diar_ors", "ch_diar_zinc" ))]
 # empty dataframe for storing model info
 modinfo <- data.frame()
 
-# subset to included indicators
-df_ind <- subset(ind, status == "include")
-
 # merge outcome variables with covariates
-dat <- merge(est, covar, by = "ADM2_EN")
+dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 
 # for each indicator
 for(i in 1:length(v_var)){
 
-  outcome <- v_var[i]
-  print(outcome)
+  #i <- 1
+  myoutcome <- v_var[i]
+  print(myoutcome)
   
   # subset indicator
-  ind_dat <- subset(dat, variable == outcome)
+  ind_dat <- subset(dat, variable == myoutcome)
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
   
   # bound direct estimate between zero and 1
@@ -92,22 +93,26 @@ for(i in 1:length(v_var)){
     arrange(ADM2_EN)
   
   ### removing all districts with only one cluster
-  ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
+  ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) %>%
+    mutate(v_floor = 1 * dir*(1-dir) / n_obs)
+    # set variance floor:  c * p*(1-p)/k  (c = 1 is conservative; try 1.5 or 2 if needed)
   # if(nrow(ind_dist) != nrow(ind_dist_complete)){
   #   stop("district removed")
   # }
   
   # covariate group for outcome
-  v_covar_grp <- subset(ind, variable == outcome)$covar_grp
+  v_covar_grp <- subset(ind, variable == myoutcome)$covar_grp
   # covariates for this group
   df_covar_grp <- subset(indcovar, covar_grp == v_covar_grp)
   
   # for each set of covariates
   for(j in 1:(ncol(df_covar_grp)-1)){
     
+    #j <- 1
+    
     # file name
     vers <- vers_start + j
-    file_name <- paste(model_name, outcome, vers, test, sep = "-")
+    file_name <- paste(model_name, myoutcome, vers, test, sep = "-")
     print(file_name)
     
     v_cov_mod <- df_covar_grp[,j+1]
@@ -135,6 +140,7 @@ for(i in 1:length(v_var)){
       adm2_index = ind_dist_complete$district_id,
       p_hat = ind_dist_complete$dir,
       v_hat = ind_dist_complete$dir_var,
+      v_floor = ind_dist_complete$v_floor,
       d = ind_dist_complete$degf, 
       k = ind_dist_complete$n_obs,
       N_edges = length(prep$n1),
@@ -167,7 +173,7 @@ for(i in 1:length(v_var)){
                           model_name = model_name,
                           vers = vers,
                           test = test,
-                          outcome = outcome,
+                          outcome = myoutcome,
                           cov = paste(v_cov_mod, collapse = ","),
                           chains = nchains,
                           iter = niter,
@@ -333,9 +339,8 @@ for(i in 1:length(v_var)){
     df_quantile =  apply(df_p[,1:nrow(postpred)], 2 , quantile , probs = c(alpha/2,1-alpha/2) , na.rm = TRUE ) |> t()
     postpred$qt_lb <- df_quantile[, 1]
     postpred$qt_ub <- df_quantile[, 2]
-    postpred$naive <- postpred$naive * 100
-    postpred$dir <- postpred$dir * 100
-    postpred$post_mean <- postpred$post_mean * 100
+    
+    #postpred %>% select(ADM2_EN, naive, naive_var, n_obs, dir, dir_var, dirplot, dirplot_var, post_mean, qt_lb, qt_ub) %>% mutate_if(is.numeric, round, digits = 4) %>% filter(ADM2_EN == "Feni")
     
     # save posterior predictions
     write.csv(postpred, paste0("./gen/model/pred/", paste0("pred-", file_name), ".csv"), row.names = FALSE)
@@ -347,7 +352,6 @@ for(i in 1:length(v_var)){
     new_modinfo <- rbind(modinfo, old_modinfo)
     new_modinfo <- new_modinfo[order(new_modinfo$file),]
     write.csv(new_modinfo, paste0("./gen/model/audit/model-info.csv"), row.names = FALSE)
-    
     
   }
 }
