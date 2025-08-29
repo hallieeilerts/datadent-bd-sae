@@ -36,7 +36,7 @@ ind <- read_excel("./data/ind-info.xlsx")
 ################################################################################
 
 # merge outcome variables with covariates
-dat <- merge(est, covar, by = "ADM2_EN")
+dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 
 # subset to included indicators
 df_ind <- subset(ind, status == "include")

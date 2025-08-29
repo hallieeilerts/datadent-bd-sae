@@ -36,7 +36,7 @@ ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
 ################################################################################
 
 # merge outcome variables with covariates
-dat <- merge(est, covar, by = "ADM2_EN")
+dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 
 # subset to included indicators
 df_ind <- subset(ind, status == "include")
@@ -193,8 +193,8 @@ fn_imp_compare <- function(v_ind, v_covar){
 # ch_trtmnt ----------------------------------------------------------------
 
 # Possible covar 
-v_covar <- c("mother_edu", "mother_age", "residence", "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
-# excluded: "child_age", 
+v_covar <- c("child_age",  "mother_edu", "mother_age", "residence", "hhd_head_sex", "wealth_index")
+# excluded: "child_age",  "hhd_head_age", "hhd_under5",
 
 # indicators in this group
 v_ind <- subset(df_ind, covar_grp == "ch_trtmnt")$variable
@@ -228,17 +228,70 @@ df_res_all %>%
 
 ## 1st time running with all covariates
 # child_age, hhd_head_sex, hhd_head_age, mother_age are important
-# Dropping child_age and running again, because was not important at all in ors and zinc, and super important in allvac
-# wealth_index, hhd_head_age, hhd_head_sex, mother_age
-# Will go with... (based on second plot)
-# hhd_head_sex, hhd_head_age, wealth_index
+## Dropping child_age and running again, because was not important at all in ors and zinc, and super important in allvac
+# mother_age, hhd_head_age, hhd_head_sex, hhd_under5, wealth_index
+## mother_age is highly correlated with hhd_under5, not hhd_head_age... going to drop it and see what happens though.
+## hhd_head_age is only really important for ors. Try dropping that one instead of mother_age.
+# looks better. mother_age important to allvac and zinc.
+# hhd_head_sex, mother_age, hhd_under5, residence
+## dropping hhd_under5 because highly correlated with mother_age
+# hhd_head_sex, mother_age, wealth_index
+
+## After I fit all the models, these covariates didn't work well for ch_diar_ors
+# ch_allvac_either was also not fine in the model with 2 covariates. but this no big deal.
+# wealth_index was third covariate. so seems to have been causing problems
+# testing VIF and with wealth_index, variance for the three covar neared 1 or more
+# i tried hhd_head_sex, mother_age, mother_edu (instead of wealth_index) - still high
+# taking a different approach-- try hhd_head_sex, hhd_head_age, hhd_under5
+# because would be nice to include number of kids under five, and this one is less correlated with mother_age
+# nevermind = VIF is close to 1.5 for some indicators
+# go back to hhd_head_sex, hhd_head_age, mother_edu (instead of wealth_index)
+# looks good.
+
+## Third time. These covariates didn't work well for all 3-- ch_diar_zinc, ch_diar_ors, ch_allvac_either.
+# Including all covariates
+# keep mother_age, drop hhd_head_age
+
+
+vif_res <- data.frame()
+for(i in 1:length(v_ind)){
+  
+  df <- subset(dat, variable == v_ind[i])
+  df <- df[complete.cases(df[, c("dir", "child_age", "mother_age", "wealth_index")]), ]
+  nrow(dat)
+  nrow(df) # 64, all districts have values
+  mod_vif <- car::vif(lm(dir ~ child_age + mother_age + wealth_index, data = df))
+  df_vif <- as.data.frame(mod_vif)
+  names(df_vif)[1] <- "VIF"
+  df_vif$covar <- row.names(df_vif)
+  df_vif$variable <- v_ind[i]
+  vif_res <- rbind(df_vif, vif_res)
+}
+vif_res %>%
+  ggplot() +
+  geom_bar(aes(x=covar, y = VIF), stat = "identity") +
+  labs(y = "VIF") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~variable)
+# hhd_head_sex, mother_age, child_age increases variance for ch_allvac_either to 1.2
+# changing child_age to residence doesn't help. still 1.25 at highest
+# changing to mother_edu even worse
+# hhd_head_sex + mother_age + wealth_index is ok. but all covar slightly over 1 for all outcome (except wealth index for all_vac)
+# hhd_head_sex + hhd_under5 + wealth_index is very bad.
+# hhd_head_sex + hhd_under5 + mother_edu is worse.
+# hhd_head_sex + hhd_head_age + wealth_index is bad
+# hhd_head_sex + hhd_head_age + mother_edu -- all are close to 1. this was what we just tested which didn't work great.
+# hhd_head_sex + mother_age + wealth_index -- not bad
+# child_age + mother_age + wealth_index -- best so far, all under 1
+# child_age + hhd_head_age + wealth_index -- much worse
 
 
 # ch_nut ----------------------------------------------------------------
 
 # Possible covar 
-v_covar <- c("mother_edu", "child_age", "mother_age", "residence", "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
-# excluded: none
+v_covar <- c("mother_edu", "child_age",  "residence", "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
+# excluded: "mother_age",
 
 # indicators in this group
 v_ind <- subset(df_ind, covar_grp == "ch_nut")$variable
@@ -271,11 +324,39 @@ df_res_all %>%
   facet_grid(covar ~ ncovar)
 
 ## 1st time running with all covariates
-# interesting because there was not much overlap in terms of the most important covariates for each indicator (plot 1)
-# hhd_head_sex was important only for nt_ch_micro_mp, but then not important in the model with one covariate
-# hhd_head_age is second most important for nt_ch_micro_vas, but not important at all for other two
-# Will go with...
-# mother_edu, hhd_under5, mother_age
+# interesting because there was no overlap in terms of the most important covariate for each indicator (plot 1)
+# hhd_under5 and hhd_head_age seem to be slightly more important than others
+## removing mother_age because of collinearity of hhd_under5 and only wanting one age-related covar (hhd_head_age)
+# hhd_under5, hhd_head_age, wealth_index (second plot makes it seem like third in importance)
+
+## After I fit all the models, these covariates didn't work well for nt_ebf and nt_ch_micro_mp
+# seems like wealth_index was most problematic
+# testing VIF and with wealth_index, variance for the three covar neared 1.25
+# swapping for mothers_edu - tended to keep VIF below 1
+# swapping for residence - high again
+vif_res <- data.frame()
+for(i in 1:length(v_ind)){
+  
+  df <- subset(dat, variable == v_ind[i])
+  df <- df[complete.cases(df[, c("dir", "hhd_under5", "hhd_head_age","mother_edu")]), ]
+  nrow(dat)
+  nrow(df) # 64, all districts have values
+  mod_vif <- car::vif(lm(dir ~ hhd_under5 + hhd_head_age + mother_edu, data = df))
+  df_vif <- as.data.frame(mod_vif)
+  names(df_vif)[1] <- "VIF"
+  df_vif$covar <- row.names(df_vif)
+  df_vif$variable <- v_ind[i]
+  vif_res <- rbind(df_vif, vif_res)
+}
+vif_res %>%
+  ggplot() +
+  geom_bar(aes(x=covar, y = VIF), stat = "identity") +
+  labs(y = "VIF") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~variable)
+
+
 
 # # ebf ----------------------------------------------------------------
 # 
@@ -370,6 +451,7 @@ df_res_all %>%
 # Possible covar 
 # Excluding child_age and mother_age, because don't make sense for this household-level covariate
 # After running once, excluding mother_edu because has high importance and is colinear with wealth_index
+# also not really clear which mother
 v_covar <- c("residence", "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
 # excluded: "child_age",  "mother_age", "mother_edu", 
 
@@ -409,6 +491,36 @@ df_res_all %>%
 # Will go with...
 # wealth_index, hhd_head_age, hhd_under5
 
+## After I fit all the models, these covariates didn't work well for ph_wtr_improve (both second and third model)
+# ph_wtr_trt_appr also not great but not terrible
+# with wealth_index + hhd_head_age + hhd_under5 - VIF is close to 1.25
+# adding in hhd_head_sex which was most important for ph_wtr_improve
+# wealth_index + hhd_head_sex + hhd_under5 -- VIF looks better, around 1.25
+# wealth_index + hhd_head_sex + residence -- VIF high again
+# wealth_index + hhd_head_sex + hhd_head_age -- VIF <1.2 (best)
+
+vif_res <- data.frame()
+for(i in 1:length(v_ind)){
+  
+  df <- subset(dat, variable == v_ind[i])
+  df <- df[complete.cases(df[, c("dir", "wealth_index", "hhd_head_sex", "hhd_head_age")]), ]
+  nrow(dat)
+  nrow(df) # 64, all districts have values
+  mod_vif <- car::vif(lm(dir ~ wealth_index + hhd_head_sex + hhd_head_age, data = df))
+  df_vif <- as.data.frame(mod_vif)
+  names(df_vif)[1] <- "VIF"
+  df_vif$covar <- row.names(df_vif)
+  df_vif$variable <- v_ind[i]
+  vif_res <- rbind(df_vif, vif_res)
+}
+vif_res %>%
+  ggplot() +
+  geom_bar(aes(x=covar, y = VIF), stat = "identity") +
+  labs(y = "VIF") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~variable)
+
 # wm_micro ----------------------------------------------------------------
 
 # Possible covar 
@@ -416,6 +528,8 @@ df_res_all %>%
 # After running once, excluding residence (see notes below)
 v_covar <- c("mother_edu",  "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
 # excluded: "child_age", "residence", "mother_age"
+v_covar <- c("mother_edu",  "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
+# excluded: "child_age",  "mother_age", "residence"
 
 # indicators in this group
 v_ind <- subset(df_ind, covar_grp == "wm_micro")$variable
@@ -449,14 +563,12 @@ df_res_all %>%
 
 ## 1st time running with all covariates except child_age
 # note that nt_wm_micro_iron and nt_wm_micro_iron_any are essentially the same indicators
-# hhd_under5, wealth_index
-# residence or mother_age
-# residence and wealth_index are highly colinear though
-## exclude residence as seems less important than wealth_index
-# hhd_under5, mother_age are top two
-## excluding mother_age because is colinear with hhd_under5 and less important 
-# hhd_under5, hhd_head_sex, wealth_index
-
-
+# hhd_under5, residence
+## will remove mother_age due to collinearity with hhd_under5
+# hhd_under5,
+# then wealth_index from second plot
+## exclude residence due to collinearity with wealth_index
+# hhd_under5, hhd_head_age, wealth_index
+# don't want to include both maternal_edu and wealth_index due to collinearity
 
 
