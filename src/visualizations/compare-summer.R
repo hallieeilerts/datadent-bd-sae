@@ -15,7 +15,7 @@ library(patchwork)
 #' Inputs
 source("./src/util.R")
 info <- read.csv("./gen/model/audit/model-info.csv")
-info_sum <- read.csv("./gen/model/audit/model-info-summer.csv")
+info_summer <- read.csv("./gen/model/audit/model-info-summer.csv")
 ################################################################################
 
 # set inputs
@@ -260,7 +260,7 @@ pred_summer <- pred_summer[,c("ADM2_EN", "name", "model", "value", "lb", "ub")]
 
 # Subset to outcome of interest
 df_info <- subset(info, outcome == myoutcome)
-df_info_sum <- subset(info_sum, outcome == myoutcome)
+df_info_summer <- subset(info_summer, outcome == myoutcome)
 
 # if cov is NA in my model info, assign as 1
 df_info$cov[is.na(df_info$cov)] <- 1
@@ -278,12 +278,12 @@ df_info <- df_info %>%
   dplyr::select(name_mymodel, cov)
 
 # keep only name and covariates for summer
-df_info_sum <- df_info_sum %>%
+df_info_summer <- df_info_summer %>%
   mutate(name_summer = vers) %>%
   dplyr::select(name_summer, cov)
 
 # merge
-mod_merge_key <- merge(df_info, df_info_sum, by = "cov")
+mod_merge_key <- merge(df_info, df_info_summer, by = "cov")
 
 # Combine data ------------------------------------------------------------
 
