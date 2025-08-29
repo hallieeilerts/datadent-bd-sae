@@ -13,6 +13,7 @@ library(dplyr)
 library(tidyr)
 library(sf)
 library(ggplot2)
+library(readxl)
 if (!isTRUE(requireNamespace("INLA", quietly = TRUE))) {
   install.packages("INLA", repos=c(getOption("repos"), 
                                    INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
@@ -44,71 +45,71 @@ ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
 indcovar <- read_excel("./data/ind-info.xlsx", sheet = "covariates")
 ################################################################################
 
-# set model
+# set version of model
+# the first version fit will be this plus one (j)
+vers_start <- 100
+test <- 1
 model_name <- "SummerArealBYM2"
 model_file <- ""
-v_cov <- c("wealth_index", "hhd_under5", "hhd_head_age", "hhd_head_sex", "mother_age", "child_age")
-v_cov <-  v_cov[5]
-v_cov <- 1
+
+# subset to included indicators
+df_ind <- subset(ind, status == "include")
 
 # adjacency matrix
 mat <- getAmat(bangladesh_2, bangladesh_2$ADM2_EN)
 # vector of outcomes
-v_var <- unique(est$variable)
+v_var <- unique(df_ind$variable)
+
+v_intmod <- subset(old_modinfo, vers == 100)$outcome
+v_var <- unique(subset(old_modinfo, !(outcome %in% v_intmod))$outcome)
+
 # empty dataframe for storing model info
 modinfo <- data.frame()
 
-v_var <- "rh_anc_1vs"
+# merge outcome variables with covariates
+dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 
 for(i in 1:length(v_var)){
-
+  
   myoutcome <- v_var[i]
   print(myoutcome)
-  # direct estimates
-  direct <- subset(est, variable == myoutcome)
-  # covariates
-  # if a mother level covariate, do not include covariate for child age # BECAUSE IT IS THE AGE OF CHILD FOR OTHER INDICATORS... NOT SUBJECT OF THIS INDICATOR
-  if(myoutcome %in% c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1vs", "rh_anc_1tri", "nt_ebf",
-                      "nt_wm_micro_iron_any", "rh_anc_bldpres", "rh_anc_urine", "rh_anc_iron",
-                      "rh_anc_bldsamp", "rh_anc_wgt", "rh_pnc_wm_2days", "rh_pnc_nb_2days", "rh_pnc_wm_bfcounsel",
-                      "rh_del_inst", "rh_del_pvskill")){
-    v_cov_mod <- v_cov[!(v_cov %in% "child_age")]
-  }
-  # if a child level covariate, do not include covariate for mother age # REVISIT THIS. I THINK FOR CHILD LEVEL COULD INCLUDE MOTHER AGE.
-  if(myoutcome %in% c("nt_ch_micro_vas", "nt_ch_micro_dwm", "ch_diar_ors", "ch_diar_zinc","nt_ch_micro_mp")){
-    v_cov_mod <- v_cov[!(v_cov %in% "mother_age")]
-  }
-  # if a household level covariate, don't include either
-  if(myoutcome %in% c("ph_wtr_improve", "ph_wtr_trt_appr", "ph_sani_improve", "ph_hndwsh_basic")){
-    v_cov_mod <-  v_cov[!(v_cov %in% c("child_age", "mother_age"))]
-  }
-  v_cov_mod <- sort(v_cov_mod)
   
-  # check that there are any covariates. because there will be zero if the only covariate with child_age or mother_age.
-  if(length(v_cov_mod) != 0){
-    # survey design
-    if(myoutcome %in% c("nt_ebf", "nt_ch_micro_vas", "nt_ch_micro_dwm", "ch_diar_ors", "ch_diar_zinc","nt_ch_micro_mp")){
-      dhs <- dhs_chld
-    }
-    if(myoutcome %in% c("nt_wm_micro_iron", "rh_anc_4vs", "rh_anc_1vs", "rh_anc_1tri",  "nt_ebf",
-                        "nt_wm_micro_iron_any", "rh_anc_bldpres", "rh_anc_urine", "rh_anc_iron",
-                        "rh_anc_bldsamp", "rh_anc_wgt", "rh_pnc_wm_2days", "rh_pnc_nb_2days", "rh_pnc_wm_bfcounsel",
-                        "rh_del_inst", "rh_del_pvskill")){
-      dhs <- dhs_mth
-    }
-    if(myoutcome %in% c("rh_del_inst", "rh_del_pvskill")){
-      dhs <- dhs_bth
-    }
-    if(myoutcome %in% c("ph_wtr_improve", "ph_wtr_trt_appr", "ph_sani_improve", "ph_hndwsh_basic")){
-      dhs <- dhs_hhd
-      dhs$v001 <- dhs$hv001
-      dhs$v023 <- dhs$hv023
-    }
-    design <- dhs %>% as_survey_design(ids = "v001", # psu
-                                       strata = "v023", # strata for sampling
-                                       weights = "wt",
-                                       nest = TRUE)
-    #X_covar <- covar %>% select(ADM2_EN, all_of(v_cov_mod)) # Should have area name and covariates
+  # subset indicator direct estimate
+  direct <- subset(dat, variable == myoutcome)
+  
+  # covariate group for outcome
+  v_covar_grp <- subset(ind, variable == myoutcome)$covar_grp
+  # covariates for this group
+  df_covar_grp <- subset(indcovar, covar_grp == v_covar_grp)
+  
+  # set appropriate dataset for indicator
+  mydhs <- subset(ind, variable == myoutcome)$dhs_dataset
+  if(mydhs %in% "ir"){ dhs <- dhs_mth}
+  if(mydhs %in% "kr"){ dhs <- dhs_chld}
+  if(mydhs %in% "br"){ dhs <- dhs_bth}
+  if(mydhs %in% "hr"){ dhs <- dhs_hhd
+                       dhs$v001 <- dhs$hv001
+                       dhs$v023 <- dhs$hv023 }
+  
+  # survey design
+  design <- dhs %>% as_survey_design(ids = "v001", # psu
+                                     strata = "v023", # strata for sampling
+                                     weights = "wt",
+                                     nest = TRUE)
+  
+  # for each set of covariates
+  for(j in 1:(ncol(df_covar_grp)-1)){
+    
+    # file name
+    vers <- vers_start + j
+    file_name <- paste(model_name, myoutcome, vers, test, sep = "-")
+    print(file_name)
+    
+    v_cov_mod <- df_covar_grp[,j+1]
+    v_cov_mod <- v_cov_mod[!is.na(v_cov_mod)]
+    # for fitting intercept model (also change j loop to only run once)
+    #v_cov_mod <- 1
+    print(v_cov_mod)
     
     # model formula
     fmla <- as.formula(paste(myoutcome, "~", paste(v_cov_mod, collapse = " + ")))
@@ -123,20 +124,17 @@ for(i in 1:length(v_var)){
                                level = 0.95)
     
     # Save model info
-    n_vers <- old_modinfo %>% 
-      filter(outcome == myoutcome) %>%
-      nrow() + 1
-    filename <- paste0(model_name, "-", myoutcome, "-", n_vers)
-    df_info <- data.frame(file = filename,
+    df_info <- data.frame(file = file_name,
                           model_name = model_name,
-                          vers = n_vers,
+                          vers = vers,
+                          test = test,
                           outcome = myoutcome,
                           cov = paste(v_cov_mod, collapse = ","),
                           date = format(Sys.Date(), "%Y%m%d"))
     modinfo <- rbind(modinfo, df_info)
     
     # Save model fit
-    write.csv(summer.brfss$bym2.model.est, paste0("./gen/model/pred-summer/pred-", filename, ".csv"), row.names = FALSE)
+    write.csv(summer.brfss$bym2.model.est, paste0("./gen/model/pred-summer/pred-", file_name, ".csv"), row.names = FALSE)
   }
 }
 
@@ -148,6 +146,6 @@ if(nrow(old_modinfo) > 0){
 new_modinfo <- rbind(modinfo, old_modinfo)
 new_modinfo <- new_modinfo[order(new_modinfo$outcome, new_modinfo$vers),]
 write.csv(new_modinfo, paste0("./gen/model/audit/model-info-summer.csv"), row.names = FALSE)
-#write.csv(df_modinfo, paste0("./gen/model/audit/model-info-summer.csv"), row.names = FALSE)
+
 
 
