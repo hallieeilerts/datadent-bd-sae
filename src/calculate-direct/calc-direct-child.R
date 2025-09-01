@@ -89,18 +89,7 @@ obs_n <- data.frame()
 for(i in 1:length(dhs_codes$variable)){
   
   myvar <- dhs_codes$variable[i]
-  
-  # # this one doesn't work when district has zero observations. gets dropped
-  # df_crosstab <- dhs %>%
-  #   group_by(ADM1_EN, ADM2_EN) %>%
-  #   filter(!is.na(get(myvar))) %>%
-  #   summarise(obs_un = n(),
-  #             obs_wn = sum(wt)) %>%
-  #   group_by(ADM1_EN) %>%
-  #   mutate(obs_un_adm1_avg = mean(obs_un, na.rm = TRUE),
-  #          obs_wn_adm1_avg = mean(obs_wn, na.rm = TRUE),
-  #           variable = myvar)
-  
+
   df_crosstab <- dhs %>%
     group_by(ADM1_EN, ADM2_EN) %>%
     mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
@@ -117,10 +106,16 @@ for(i in 1:length(dhs_codes$variable)){
 }
 
 # by district, calculate number of clusters and degrees of freedom
+# dhs_degf <- dhs %>%
+#   group_by(ADM2_EN) %>%
+#   summarise(n_obs = n_distinct(v001),
+#             degf = n_obs - 1) # psu/clusters v001? households v002?
+
+# note: changing so as to no longer have n_obs be number of clusters
+# now it is actually the number of observations
 dhs_degf <- dhs %>%
   group_by(ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1) # psu/clusters v001? households v002?
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 # MERGE
 
@@ -143,65 +138,85 @@ est_adm2_forplot$dir_var[is.na(est_adm2_forplot$naive_var)] <- NA
 # UNDER CONSTRUCTION TO REPLACE "adm2 direct for modeling" SYNTHETIC HOUSEHOLD METHOD BELOW
 ##########################################################
 
+# vector of variables
+v_var <- unique(naive$variable)
+
+ll_res <- list()
+for(i in 1:length(v_var)){
+  
+  # select var
+  myvar <- v_var[i]
+  # Grab the variable name as a symbol
+  var_sym <- sym(v_var[i])
+  
+  ll_res[[i]] <- sae_df(df = dhs, est_orig = est_adm2_forplot, 
+                  geo_level = "ADM2_EN", strata = "v023")
+}
+l_res <- lapply(ll_res, function(x) x[[1]])
+est_adm2_phantom <- do.call(rbind, l_res)
+# compare this against est_adm2, ultimately rename it that.
+
+
+# TESTING code below. ignore rest of section -----
 
 # vector of variables
 v_var <- unique(naive$variable)
 
+geo_level = "ADM2_EN"
+strata = "v023"
+geo_level_upper = NULL
+strata_formula <- as.formula(paste("~", paste(strata, collapse = " + ")))
+
+i <- which(v_var %in% "ch_diar_ors")
+i <- which(v_var %in% "nt_ch_micro_vas")
 myvar <- v_var[i]
 # Grab the variable name as a symbol
 var_sym <- sym(v_var[i])
 
-# df_aggregates should have naive, naive_var, design_based_mean, design_based_var, n (number of clusters), degf (cluster minus 1)
+# df_aggregates should have naive, naive_var, design_based_mean, design_based_var, n_obs (number of clusters), degf (cluster minus 1)
 df_aggregates <- est_adm2_forplot %>% filter(variable %in% myvar)
 
 # calculate cluster level variance
 df_cluster_level <- dhs %>% 
-  filter(variable %in% myvar) %>%
-  group_by(ADM2_EN, v001, v023) %>%
+  group_by(pick(unique(c(geo_level_upper, geo_level, strata, "v001")))) %>%
   summarise(cluster_mean = mean(.data[[var_sym]], na.rm = TRUE),
             cluster_count = sum(.data[[var_sym ]], na.rm = TRUE),
             cluster_weight = sum(wt),
-            n_hh = n(),
-            n = sum(!is.na(.data[[var_sym]]))
+            #n_hh = n(),
+            n_hh = sum(!is.na(.data[[var_sym]])) # Hallie change. make number of households be those with non missing values for indicator. in sahoko's survey, all households had a value.
   ) %>% 
   ungroup() %>%
   mutate(ea = as.character(v001),
-         strata_name = paste(.data[[strata[1]]],.data[[strata[2]]], sep = "_")
+         strata_name = paste(.data[[strata[1]]])
   )
-# df_cluster_level <- df |> 
-#   group_by(pick(unique(c(geo_level_upper, geo_level, strata, "ea")))) |>
-#   summarise(cluster_mean = mean(.data[[nutrient_colname]], na.rm = TRUE),
-#             cluster_count = sum(.data[[nutrient_colname]], na.rm = TRUE),
-#             cluster_weight = sum(survey_wgt),
-#             n_hh = n(),
-#             n = sum(!is.na(.data[[nutrient_colname]]))
-#   ) |> ungroup() |>
-#   mutate(ea = as.character(ea),
-#          strata_name = paste(.data[[strata[1]]],.data[[strata[2]]],sep = "_")
-#   )
 df_cluster_level_original <- df_cluster_level
 
+# filtering to adm2/strata combos that contain only one distinct cluster mean value
+# (i.e., only have 1 cluster or have no between cluster variance)
 df_geo_phantom <- df_cluster_level %>%  
-  group_by(pick(unique(c(geo_level_upper, geo_level,strata)))) %>%
+  group_by(pick(unique(c(geo_level_upper, geo_level, strata)))) %>% #View
   summarise(n_values = n_distinct(cluster_mean)) %>%
   filter(n_values == 1) %>%
   select(all_of(unique(c(geo_level_upper,geo_level,strata)))) %>%
-  mutate(strata_name = paste(.data[[strata[1]]],.data[[strata[2]]], sep = "_"))
+  mutate(strata_name = paste(.data[[strata[1]]]))
+  
 strata_list <- unique(df_geo_phantom[["strata_name"]])
 j = 0
 for(each_stratum in strata_list){
   
+  each_stratum <- "1"
   geo_phantom_list <- df_geo_phantom[[geo_level]][df_geo_phantom[["strata_name"]]==each_stratum]
   
   df_tmp_to_add <- df_cluster_level %>%
     filter(strata_name == each_stratum) %>%
     group_by(pick(unique(c(geo_level_upper, strata, "strata_name")))) %>%
-    summarise(cluster_mean = weighted.mean(cluster_mean,cluster_weight,na.rm = TRUE),
+    summarise(cluster_mean = weighted.mean(cluster_mean, cluster_weight, na.rm = TRUE),
               cluster_weight = sum(cluster_weight, na.rm = TRUE)/sum(n_hh),
-              n_hh = 1
-    )
+              n_hh = 1)
   
   for (each_geo in geo_phantom_list){
+    
+    each_geo <- "Barguna"
     j = j + 1
     df_cluster_level <- bind_rows(df_cluster_level,
                                   (df_tmp_to_add %>%
@@ -226,14 +241,16 @@ df_aggregates_tmp <- svyby(formula = ~cluster_mean,
                            design = df_cluster_level_svy,
                            FUN = svymean,
                            na.rm = TRUE,
-                           vartype = "var") |> 
-  rename(design_based_ph_mean = cluster_mean, design_based_ph_var = var) |>
+                           vartype = "var") %>%
+  rename(design_based_ph_mean = cluster_mean, 
+         design_based_ph_var = var) %>%
   left_join(
-    df_cluster_level |> 
+    df_cluster_level %>% 
       group_by(pick(geo_level)) |>
-      summarise(degf_ph = n() - 1, n_obs_ph = sum(n_hh))
-  )
-df_aggregates <- df_aggregates |> left_join(df_aggregates_tmp, by = geo_level)
+      summarise(degf_ph = n() - 1, # number of clusters (including phantom) minus 1
+                n_obs_ph = sum(n_hh)) # number of households per cluster
+    )
+df_aggregates <- df_aggregates %>% left_join(df_aggregates_tmp, by = geo_level)
 
 return((list(df_aggregates, df_cluster_level, df_cluster_level_original)))
 
@@ -419,6 +436,56 @@ est_adm2 <- dhs_codes %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
 #View(subset(est_adm2, variable == "nt_ebf" & ADM2_EN %in% c("Meherpur", "Narail")))
+
+
+# Compare df_res, est_adm2 ------------------------------------------------
+
+head(est_adm2_phantom)
+head(est_adm2)
+
+test1 <- est_adm2_phantom %>% 
+  select(variable, ADM2_EN, naive, naive_var, 
+         dir, dir_var, 
+         design_based_ph_mean, design_based_ph_var, degf_ph, n_obs_ph)
+test2 <- est_adm2 %>%
+  select(variable, ADM2_EN, obs_un, degf, dir, dir_var) %>%
+  rename(dir_synhhd = dir,
+         dir_var_synhhd = dir_var)
+test <- merge(test1, test2, by = c("variable", "ADM2_EN"))
+test <- test %>%
+  mutate(across(where(is.numeric), ~ round(., 5))) %>%
+  mutate(flag = ifelse(dir_synhhd != dir, 1, 0)) %>%
+  mutate(flag2 = ifelse(dir_synhhd != design_based_ph_mean, 1, 0)) %>%
+  select(variable, ADM2_EN,  obs_un, n_obs_ph, degf, degf_ph, naive, naive_var, dir, dir_var, dir_synhhd, dir_var_synhhd, design_based_ph_mean, design_based_ph_var, flag, flag2)
+View(test)
+
+# NOTE:
+# n_obs - number of clusters
+# degf - number of clusters minus 1
+# degf_ph - number of clusters (including phantom cluster if added) minus 1
+# n_obs_ph - number of observations in phantom cluster calculation, which refers to households. so doesn't correspond with n_obs.
+# do i need to add to un and wn? I think not. keep those empirically calculated for use by Maiga and Hannah.
+
+# !!!!!AUG 29, 2025
+# This is where i left off
+# comparing my synthetic household approach with the new phantom household approach
+# I think i've decided that the above n_ and degf_ variables are fine and don't need to be adjusted
+# look a little more at how close the syn direct and ph direct estimates are
+# Then replace the syn approach with the ph
+
+# make sure districts with zero observations remain NA
+# i think fine to not adjust covariates for any districts that got a phantom household
+
+# remind maiga and hana that ll and ul are calculated from quantiles, not the model se. what are they using se for?
+
+# SEPT 1, 2025
+# removing n_obs. use un_obs instead. make this change across all calc-direct files
+# this un_obs matches what sahoko's n_obs is (number of observations). i need to take into account those with missing values.
+
+
+# Replace adm2 direct with ph ---------------------------------------------
+
+# Replace adm2 direct estimates with phantom household when called for
 
 # adm1 --------------------------------------------------------------------
 
