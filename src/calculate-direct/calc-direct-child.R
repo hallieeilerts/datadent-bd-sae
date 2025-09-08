@@ -8,6 +8,7 @@ rm(list = ls())
 library(tidyr)
 library(dplyr)
 library(srvyr)
+library(survey)
 #' Inputs
 source("./src/util.R")
 dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
@@ -32,7 +33,8 @@ naive <- dhs %>%
             ch_diar_zinc = mean(ch_diar_zinc, na.rm = TRUE),
             ch_diar_ors = mean(ch_diar_ors, na.rm = TRUE),
             ch_allvac_either = mean(ch_allvac_either, na.rm = TRUE),
-            nt_ch_gwmt_any = mean(nt_ch_gwmt_any, na.rm = TRUE)) %>%
+            nt_ch_gwmt_any = mean(nt_ch_gwmt_any, na.rm = TRUE),
+            nt_ch_micro_iron = mean(nt_ch_micro_iron, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive")
 
 naive_var <- dhs %>% 
@@ -44,7 +46,8 @@ naive_var <- dhs %>%
             ch_diar_zinc = var(ch_diar_zinc, na.rm = TRUE),
             ch_diar_ors = var(ch_diar_ors, na.rm = TRUE),
             ch_allvac_either = var(ch_allvac_either, na.rm = TRUE),
-            nt_ch_gwmt_any = var(nt_ch_gwmt_any, na.rm = TRUE)) %>%
+            nt_ch_gwmt_any = var(nt_ch_gwmt_any, na.rm = TRUE),
+            nt_ch_micro_iron = var(nt_ch_micro_iron, na.rm = TRUE)) %>%
   pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "naive_var")
 
 
@@ -72,7 +75,8 @@ dir <- dhs_svy %>%
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
             ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
             ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
-            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var"))
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_iron = survey_mean(nt_ch_micro_iron, na.rm = TRUE, vartype = "var"))
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM2_EN", v_var)]
@@ -105,14 +109,7 @@ for(i in 1:length(dhs_codes$variable)){
   
 }
 
-# by district, calculate number of clusters and degrees of freedom
-# dhs_degf <- dhs %>%
-#   group_by(ADM2_EN) %>%
-#   summarise(n_obs = n_distinct(v001),
-#             degf = n_obs - 1) # psu/clusters v001? households v002?
-
-# note: changing so as to no longer have n_obs be number of clusters
-# now it is actually the number of observations
+# by district, calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
   group_by(ADM2_EN) %>%
   summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
@@ -134,10 +131,6 @@ est_adm2_forplot$dir_var[is.na(est_adm2_forplot$naive_var)] <- NA
 
 # adm2 phantom household --------------------------------------------------
 
-##########################################################
-# UNDER CONSTRUCTION TO REPLACE "adm2 direct for modeling" SYNTHETIC HOUSEHOLD METHOD BELOW
-##########################################################
-
 # vector of variables
 v_var <- unique(naive$variable)
 
@@ -146,6 +139,7 @@ for(i in 1:length(v_var)){
   
   # select var
   myvar <- v_var[i]
+  print(myvar)
   # Grab the variable name as a symbol
   var_sym <- sym(v_var[i])
   
@@ -154,108 +148,9 @@ for(i in 1:length(v_var)){
 }
 l_res <- lapply(ll_res, function(x) x[[1]])
 est_adm2_phantom <- do.call(rbind, l_res)
-# compare this against est_adm2, ultimately rename it that.
 
 
-# TESTING code below. ignore rest of section -----
-
-# vector of variables
-v_var <- unique(naive$variable)
-
-geo_level = "ADM2_EN"
-strata = "v023"
-geo_level_upper = NULL
-strata_formula <- as.formula(paste("~", paste(strata, collapse = " + ")))
-
-i <- which(v_var %in% "ch_diar_ors")
-i <- which(v_var %in% "nt_ch_micro_vas")
-myvar <- v_var[i]
-# Grab the variable name as a symbol
-var_sym <- sym(v_var[i])
-
-# df_aggregates should have naive, naive_var, design_based_mean, design_based_var, n_obs (number of clusters), degf (cluster minus 1)
-df_aggregates <- est_adm2_forplot %>% filter(variable %in% myvar)
-
-# calculate cluster level variance
-df_cluster_level <- dhs %>% 
-  group_by(pick(unique(c(geo_level_upper, geo_level, strata, "v001")))) %>%
-  summarise(cluster_mean = mean(.data[[var_sym]], na.rm = TRUE),
-            cluster_count = sum(.data[[var_sym ]], na.rm = TRUE),
-            cluster_weight = sum(wt),
-            #n_hh = n(),
-            n_hh = sum(!is.na(.data[[var_sym]])) # Hallie change. make number of households be those with non missing values for indicator. in sahoko's survey, all households had a value.
-  ) %>% 
-  ungroup() %>%
-  mutate(ea = as.character(v001),
-         strata_name = paste(.data[[strata[1]]])
-  )
-df_cluster_level_original <- df_cluster_level
-
-# filtering to adm2/strata combos that contain only one distinct cluster mean value
-# (i.e., only have 1 cluster or have no between cluster variance)
-df_geo_phantom <- df_cluster_level %>%  
-  group_by(pick(unique(c(geo_level_upper, geo_level, strata)))) %>% #View
-  summarise(n_values = n_distinct(cluster_mean)) %>%
-  filter(n_values == 1) %>%
-  select(all_of(unique(c(geo_level_upper,geo_level,strata)))) %>%
-  mutate(strata_name = paste(.data[[strata[1]]]))
-  
-strata_list <- unique(df_geo_phantom[["strata_name"]])
-j = 0
-for(each_stratum in strata_list){
-  
-  each_stratum <- "1"
-  geo_phantom_list <- df_geo_phantom[[geo_level]][df_geo_phantom[["strata_name"]]==each_stratum]
-  
-  df_tmp_to_add <- df_cluster_level %>%
-    filter(strata_name == each_stratum) %>%
-    group_by(pick(unique(c(geo_level_upper, strata, "strata_name")))) %>%
-    summarise(cluster_mean = weighted.mean(cluster_mean, cluster_weight, na.rm = TRUE),
-              cluster_weight = sum(cluster_weight, na.rm = TRUE)/sum(n_hh),
-              n_hh = 1)
-  
-  for (each_geo in geo_phantom_list){
-    
-    each_geo <- "Barguna"
-    j = j + 1
-    df_cluster_level <- bind_rows(df_cluster_level,
-                                  (df_tmp_to_add %>%
-                                     mutate(!!geo_level := each_geo,
-                                            ea = paste0("phantom",as.character(j)))
-                                  )
-    )
-  }
-}
-
-# cluster level survey design
-df_cluster_level_svy <- svydesign(
-  ids = ~ea,
-  strata = strata_formula,  
-  weights = ~cluster_weight,
-  data = df_cluster_level,
-  nest = TRUE
-)
-
-df_aggregates_tmp <- svyby(formula = ~cluster_mean, 
-                           by = as.formula(paste("~",geo_level)),
-                           design = df_cluster_level_svy,
-                           FUN = svymean,
-                           na.rm = TRUE,
-                           vartype = "var") %>%
-  rename(design_based_ph_mean = cluster_mean, 
-         design_based_ph_var = var) %>%
-  left_join(
-    df_cluster_level %>% 
-      group_by(pick(geo_level)) |>
-      summarise(degf_ph = n() - 1, # number of clusters (including phantom) minus 1
-                n_obs_ph = sum(n_hh)) # number of households per cluster
-    )
-df_aggregates <- df_aggregates %>% left_join(df_aggregates_tmp, by = geo_level)
-
-return((list(df_aggregates, df_cluster_level, df_cluster_level_original)))
-
-
-# adm2 direct for modeling ------------------------------------------------
+# adm2 synthetic household ------------------------------------------------
 
 # this adds a synthetic household when all values are 0 or 1
 # perturbs values if prevalence is exactly 0.5 (and thus variance is 0)
@@ -435,57 +330,28 @@ est_adm2 <- dhs_codes %>%
   left_join(obs_n, by = c("ADM2_EN", "variable")) %>%
   left_join(dhs_degf, by = c("ADM2_EN"))
 
-#View(subset(est_adm2, variable == "nt_ebf" & ADM2_EN %in% c("Meherpur", "Narail")))
+# Combine adm2 direct and phantom -----------------------------------------
 
+# merge adm2 direct and adm2 with phantom households
+est_adm2_combined <- est_adm2 %>%
+  left_join(est_adm2_phantom %>% 
+              select(variable, ADM2_EN, design_based_ph_mean, design_based_ph_var, degf_ph, n_obs_ph),
+            by = c("variable", "ADM2_EN"))
 
-# Compare df_res, est_adm2 ------------------------------------------------
-
-head(est_adm2_phantom)
-head(est_adm2)
-
-test1 <- est_adm2_phantom %>% 
-  select(variable, ADM2_EN, naive, naive_var, 
-         dir, dir_var, 
-         design_based_ph_mean, design_based_ph_var, degf_ph, n_obs_ph)
-test2 <- est_adm2 %>%
-  select(variable, ADM2_EN, obs_un, degf, dir, dir_var) %>%
-  rename(dir_synhhd = dir,
-         dir_var_synhhd = dir_var)
-test <- merge(test1, test2, by = c("variable", "ADM2_EN"))
-test <- test %>%
-  mutate(across(where(is.numeric), ~ round(., 5))) %>%
-  mutate(flag = ifelse(dir_synhhd != dir, 1, 0)) %>%
-  mutate(flag2 = ifelse(dir_synhhd != design_based_ph_mean, 1, 0)) %>%
-  select(variable, ADM2_EN,  obs_un, n_obs_ph, degf, degf_ph, naive, naive_var, dir, dir_var, dir_synhhd, dir_var_synhhd, design_based_ph_mean, design_based_ph_var, flag, flag2)
-View(test)
-
-# NOTE:
-# n_obs - number of clusters
-# degf - number of clusters minus 1
-# degf_ph - number of clusters (including phantom cluster if added) minus 1
-# n_obs_ph - number of observations in phantom cluster calculation, which refers to households. so doesn't correspond with n_obs.
-# do i need to add to un and wn? I think not. keep those empirically calculated for use by Maiga and Hannah.
-
-# !!!!!AUG 29, 2025
-# This is where i left off
-# comparing my synthetic household approach with the new phantom household approach
-# I think i've decided that the above n_ and degf_ variables are fine and don't need to be adjusted
-# look a little more at how close the syn direct and ph direct estimates are
-# Then replace the syn approach with the ph
-
-# make sure districts with zero observations remain NA
-# i think fine to not adjust covariates for any districts that got a phantom household
-
-# remind maiga and hana that ll and ul are calculated from quantiles, not the model se. what are they using se for?
-
-# SEPT 1, 2025
-# removing n_obs. use un_obs instead. make this change across all calc-direct files
-# this un_obs matches what sahoko's n_obs is (number of observations). i need to take into account those with missing values.
-
-
-# Replace adm2 direct with ph ---------------------------------------------
-
-# Replace adm2 direct estimates with phantom household when called for
+# replace direct with phantom household when...
+# obs_un != 0 (direct should still be NA in such cases)
+# obs_un != n_obs_ph (a phantom household was added)
+# Note this results in some relatively large changes with obs_un was 1
+## subset(est_adm2_combined, variable == "ch_diar_zinc" & obs_un == 1)
+est_adm2_combined <- est_adm2_combined %>%
+  mutate(dir = case_when(
+    obs_un != 0 & obs_un != n_obs_ph ~ design_based_ph_mean,
+    TRUE ~ dir),
+  dir_var = case_when(
+    obs_un != 0 & obs_un != n_obs_ph ~ design_based_ph_var,
+    TRUE ~ dir_var),
+  dir_replacedw_ph = ifelse(obs_un != 0 & obs_un != n_obs_ph, 1, 0)
+  ) 
 
 # adm1 --------------------------------------------------------------------
 
@@ -505,7 +371,8 @@ dir <- dhs_svy %>%
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
             ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
             ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
-            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var")) 
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_iron = survey_mean(nt_ch_micro_iron, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[,c("ADM1_EN", v_var)]
@@ -522,14 +389,7 @@ obs_n <- data.frame()
 for(i in 1:length(dhs_codes$variable)){
   
   myvar <- dhs_codes$variable[i]
-  
-  # df_crosstab <- dhs %>%
-  #   group_by(ADM1_EN) %>%
-  #   filter(!is.na(get(myvar))) %>%
-  #   summarise(obs_un = n(),
-  #             obs_wn = sum(wt)) %>%
-  #   mutate(variable = myvar)
-  # should do same as above, but has consistent syntax with adm2 approach
+
   df_crosstab <- dhs %>%
     group_by(ADM1_EN) %>%
     mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
@@ -543,11 +403,10 @@ for(i in 1:length(dhs_codes$variable)){
   
 }
 
-# by district, calculate number of clusters and degrees of freedom
+# by adm1, calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
   group_by(ADM1_EN) %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1)
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 est_adm1 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
@@ -573,7 +432,8 @@ dir <- dhs_svy %>%
             ch_diar_zinc = survey_mean(ch_diar_zinc, na.rm = TRUE, vartype = "var"),
             ch_diar_ors = survey_mean(ch_diar_ors, na.rm = TRUE, vartype = "var"),
             ch_allvac_either = survey_mean(ch_allvac_either, na.rm = TRUE, vartype = "var"),
-            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var")) 
+            nt_ch_gwmt_any = survey_mean(nt_ch_gwmt_any, na.rm = TRUE, vartype = "var"),
+            nt_ch_micro_iron = survey_mean(nt_ch_micro_iron, na.rm = TRUE, vartype = "var")) 
 v_var <- names(dir)[grepl("_var", names(dir))]
 v_dir <- names(dir)[!grepl("_var", names(dir))]
 dir_var <- dir[, v_var]
@@ -607,10 +467,9 @@ for(i in 1:length(dhs_codes$variable)){
   
 }
 
-# by district, calculate number of clusters and degrees of freedom
+# calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1)
+  summarise(degf = n_distinct(v001) - 1)
 
 est_adm0 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
@@ -622,6 +481,6 @@ est_adm0 <- dhs_codes %>%
 # Save --------------------------------------------------------------------
 
 write.csv(est_adm2_forplot, file = "./gen/calculate-direct/temp/direct-child-forplot.csv", row.names = FALSE)
-write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-child.csv", row.names = FALSE)
+write.csv(est_adm2_combined, file = "./gen/calculate-direct/temp/direct-child.csv", row.names = FALSE)
 write.csv(est_adm1, file = "./gen/calculate-direct/temp/direct-child-adm1.csv", row.names = FALSE)
 write.csv(est_adm0, file = "./gen/calculate-direct/temp/direct-child-adm0.csv", row.names = FALSE)
