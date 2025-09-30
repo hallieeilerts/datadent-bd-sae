@@ -9,6 +9,7 @@ library(dplyr)
 library(tidyr)
 library(here)
 library(cmdstanr)
+library(readxl)
 #' Inputs
 source("./src/util.R")
 ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
@@ -38,32 +39,6 @@ for(i in 1:length(v_var)){
   myinfo <- subset(info, outcome == myoutcome)[,c("vers", "test", "cov")]
   myinfo$model <- paste(myinfo$vers, myinfo$test, sep = "-")
   
-  # # subset direct_adm2 weights this outcome
-  # mywt <- subset(direct_adm2, variable == myoutcome)[,c("ADM2_EN", "ADM1_EN", "obs_un", "obs_wn", "n_obs", "obs_un_adm1_avg", "obs_wn_adm1_avg")]
-  # # sum up adm1 and adm0 weights for merging onto results below
-  # mywt_adm1 <- mywt %>%
-  #   group_by(ADM1_EN) %>%
-  #   summarise(obs_un = sum(obs_un, na.rm = TRUE), 
-  #             obs_wn = sum(obs_wn, na.rm = TRUE), 
-  #             n_obs = sum(n_obs, na.rm = TRUE))
-  # mywt_adm0 <- mywt %>%
-  #   mutate(ADM0_EN = "Bangladesh") %>%
-  #   group_by(ADM0_EN) %>%
-  #   summarise(obs_un = sum(obs_un, na.rm = TRUE), 
-  #             obs_wn = sum(obs_wn, na.rm = TRUE), 
-  #             n_obs = sum(n_obs, na.rm = TRUE))
-  # # fill in missing weights at adm2 level with adm1 average prior to aggregation
-  # mywt_adm2 <- mywt %>%
-  #   mutate(obs_un = case_when(
-  #     is.na(obs_un) ~ obs_un_adm1_avg,
-  #     TRUE ~ obs_un
-  #   ),
-  #   obs_wn = case_when(
-  #     is.na(obs_wn) ~ obs_wn_adm1_avg,
-  #     TRUE ~ obs_wn
-  #   )) %>%
-  #   select(ADM2_EN, ADM1_EN, obs_un, obs_wn, n_obs)
-  # subset direct_adm2 weights this outcome
   # fill in missing weights at adm2 level with adm1 average prior to aggregation
   mywt_adm2 <- direct_adm2 %>%
     filter(variable == myoutcome) %>%
@@ -75,16 +50,16 @@ for(i in 1:length(v_var)){
       obs_wn == 0 ~ obs_wn_adm1_avg,
       TRUE ~ obs_wn
     )) %>%
-    select(ADM2_EN, ADM1_EN, obs_un, obs_wn, n_obs)
+    select(ADM2_EN, ADM1_EN, obs_un, obs_wn)
   
   # subset adm1 and adm0 weights
   mywt_adm1 <- direct_adm1 %>%
     filter(variable == myoutcome) %>%
-    select(ADM1_EN, dir, dir_var, obs_un, obs_wn, n_obs)
+    select(ADM1_EN, dir, dir_var, obs_un, obs_wn)
   mywt_adm0 <- direct_adm0 %>%
     filter(variable == myoutcome) %>%
     mutate(ADM0_EN = "Bangladesh") %>%
-    select(ADM0_EN, dir, dir_var, obs_un, obs_wn, n_obs)
+    select(ADM0_EN, dir, dir_var, obs_un, obs_wn)
 
   ## VARIANCE SMOOTHING MODEL
   
@@ -162,7 +137,7 @@ for(i in 1:length(v_var)){
     select(variable, admin_level, ADM0_EN, ADM1_EN, 
            dir, dir_var,
            post_mean, post_var, qt_lb, qt_ub, 
-           obs_un, obs_wn, n_obs, 
+           obs_un, obs_wn, 
            model, cov)
   
   dat <- rbind(df_agg, dat)

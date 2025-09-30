@@ -46,6 +46,7 @@ agg_adm1 <- subset(agg, admin_level == "adm1")
 names(agg_adm1)[which(names(agg_adm1) == "qt_lb")] <- "lb"
 names(agg_adm1)[which(names(agg_adm1) == "qt_ub")] <- "ub"
 names(agg_adm1)[which(names(agg_adm1) == "post_mean")] <- "agg"
+agg_adm1 <- agg_adm1[,c("variable", "ADM1_EN", "agg", "lb", "ub")]
 
 # merge
 dat <- merge(dir_adm1, agg_adm1, by = c("variable", "ADM1_EN"), suffixes = c("_dir", "_agg"))
@@ -93,18 +94,29 @@ for(i in 1:length(v_var)){
 # Plot uncertainty intervals
 dat2 <- bind_rows(dir_adm1 %>% mutate(name = "Direct"), agg_adm1 %>% mutate(name = "agg"))
 dat2$value <- ifelse(!is.na(dat2$dir), dat2$dir, dat2$agg)
+# merge on int_overlap
+dat2 <- dat2 %>%
+  left_join(dat %>% select(variable, ADM1_EN, int_overlap) %>% distinct(), by = c("variable", "ADM1_EN")) %>%
+  mutate(name = ifelse(name == "agg", "Aggregated adm2", name)) %>%
+  mutate(int_overlap = ifelse(int_overlap == TRUE, "Overlap", "No overlap"))
+nrow(subset(dat2, int_overlap == "Overlap" & name == "Aggregated adm2")) # 221
+length(unique(subset(dat2, int_overlap == "No overlap")$variable)) # 2
+length(unique(dat2$variable)) # 28
+
 p3 <- dat2 %>%
   ggplot(aes(x = ADM1_EN, y = value, color = name, group = name)) +
   geom_errorbar(aes(ymin = lb, ymax = ub), position = position_dodge(width = 0.8), width = 0.2) +
-  geom_point(position = position_dodge(width = 0.8)) +
-  labs(x = "", y = "") +
+  geom_point(aes(shape = int_overlap), position = position_dodge(width = 0.8)) +
+  labs(x = "", y = "", title = "Comparison of direct adm1 and modeled-aggregated adm2") +
   theme_bw() +
   coord_flip() +
-  theme(text = element_text(size = 10), legend.title=element_blank()) +
+  theme(text = element_text(size = 10), legend.title=element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_shape_manual(values = c(8, 16)) +
   scale_color_discrete(guide = guide_legend(reverse = TRUE)) +
-  facet_wrap(~variable)
+  facet_wrap(~variable) 
 
-ggsave(paste0("./gen/validation/audit/adm1-uncert-int.png"), p3, width = 12, height = 10, units = "in", dpi = 300)
+ggsave(paste0("./gen/validation/audit/adm1-uncert-int.png"), p3, width = 10, height = 5.5, units = "in", dpi = 300)
 
 # adm0 --------------------------------------------------------------------
 
