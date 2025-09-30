@@ -58,6 +58,7 @@ stanfile <- here(paste0("src/model/", model_file))
 # vector of outcomes
 v_var <- unique(est$variable)
 #v_var <- "ch_diar_ors"
+#v_var <- subset(ind, dhs_dataset == "kr" & status == "include")$variable
 
 # empty dataframe for storing model info
 modinfo <- data.frame()
@@ -73,8 +74,8 @@ for(i in 1:length(v_var)){
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
   
   # bound direct estimate between zero and 1
-  eps <- 1e-10  # small buffer away from 0 and 1
-  ind_dat$dir <- pmin(1 - eps, pmax(eps, ind_dat$dir))
+  #eps <- 1e-10  # small buffer away from 0 and 1
+  #ind_dat$dir <- pmin(1 - eps, pmax(eps, ind_dat$dir))
   
   # join spatial data
   ind_dist <- bangladesh_2 %>% 
@@ -85,7 +86,7 @@ for(i in 1:length(v_var)){
   #ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
   ind_dist_complete <- ind_dist |>
     filter(!is.na(dir_var), degf != 0, dir_var > 1e-10) %>%
-    mutate(v_floor = 1 * dir*(1-dir) / n_obs)
+    mutate(v_floor = 1 * dir*(1-dir) / obs_un)
   
   # Compile model
   mod <- cmdstan_model(stanfile)
@@ -97,7 +98,7 @@ for(i in 1:length(v_var)){
     v_hat = ind_dist_complete$dir_var,
     v_floor = ind_dist_complete$v_floor,
     d = ind_dist_complete$degf, 
-    k = ind_dist_complete$n_obs,
+    k = ind_dist_complete$obs_un,
     N_edges = length(prep$n1),
     node1 = prep$n1,
     node2 = prep$n2,
