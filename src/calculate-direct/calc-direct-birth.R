@@ -79,11 +79,10 @@ for(i in 1:length(dhs_codes$variable)){
   obs_n <- rbind(obs_n, df_crosstab)
 }
 
-# by district, calculate number of clusters and degrees of freedom
+# by district, calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
   group_by(ADM2_EN) %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1)
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 # MERGE
 est_adm2 <- dhs_codes %>%
@@ -135,11 +134,10 @@ for(i in 1:length(dhs_codes$variable)){
   
 }
 
-# by district, calculate number of clusters and degrees of freedom
+# by adm1, calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
   group_by(ADM1_EN) %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1)
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
 
 est_adm1 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
@@ -186,10 +184,9 @@ for(i in 1:length(dhs_codes$variable)){
   
 }
 
-# by district, calculate number of clusters and degrees of freedom
+# calculate degrees of freedom (clusters - 1)
 dhs_degf <- dhs %>%
-  summarise(n_obs = n_distinct(v001),
-            degf = n_obs - 1)
+  summarise(degf = n_distinct(v001) - 1)
 
 est_adm0 <- dhs_codes %>%
   left_join(dir, by = c("variable")) %>%
