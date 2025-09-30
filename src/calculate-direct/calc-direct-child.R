@@ -9,6 +9,7 @@ library(tidyr)
 library(dplyr)
 library(srvyr)
 library(survey)
+library(readxl)
 #' Inputs
 source("./src/util.R")
 dhs <- read.csv("./gen/prepare-dhs/output/dat-child.csv")
@@ -150,200 +151,14 @@ l_res <- lapply(ll_res, function(x) x[[1]])
 est_adm2_phantom <- do.call(rbind, l_res)
 
 
-# adm2 synthetic household ------------------------------------------------
-
-# this adds a synthetic household when all values are 0 or 1
-# perturbs values if prevalence is exactly 0.5 (and thus variance is 0)
-
-# For indicators that require synthetic household
-l_res <- list()
-v_allonecat <- unique(subset(naive, naive %in% c(0,1))$variable)
-v_rest <- unique(subset(naive, !variable %in% v_allonecat)$variable)
-
-if (length(v_allonecat) > 0) {
-  
-  set.seed(123)
-  
-  # For each indicator which requires a synthetic household 
-  for (i in seq_along(v_allonecat)) {
-    
-    # Grab the variable name as a symbol
-    var_sym <- sym(v_allonecat[i])
-    
-    # Identify districts with all households in one category (prevalence of 0 or 1). This includes those where all values are NA.
-    # for adding a synthetic household
-    v_dist_01 <- naive %>%
-      filter(variable %in% v_allonecat[i], naive %in% c(0, 1)) %>%
-      pull(ADM2_EN)
-    
-    # Identify districts where all clusters have a mean of 0.5
-    # Not happy with the variance for these though. Seems too small. c("Meherpur", "Narail")
-    v_dist_0bwclustvar <- dhs %>% 
-          filter(!is.na(!!var_sym)) %>%                # filter non-missing values (treating var_sym as a variable)
-          group_by(ADM2_EN, v001) %>%                  # group by cluster
-          mutate(var_avg = mean(!!var_sym)) %>%        # calculate average by cluster
-          group_by(ADM2_EN) %>%                        # group by district
-          mutate(n_uniq_val = n_distinct(var_avg)) %>% # count number of unique averages in district
-          filter(n_uniq_val == 1) %>%                  # filter if all clusters in district have same prevalence (used to also include var_avg == 0.5 &)
-          select(ADM2_EN) %>% unique() %>% pull(ADM2_EN)
-    
-    # Subset districts
-    dist_01 <- dhs %>% filter(ADM2_EN %in% v_dist_01)
-    dist_0bwclustvar <- dhs %>% filter(ADM2_EN %in% v_dist_0bwclustvar)
-    dist_rest <- dhs %>% filter(!(ADM2_EN %in% c(v_dist_01, v_dist_0bwclustvar)))
-    
-    #View(subset(dhs, ADM2_EN %in% c("Khagrachhari", "Meherpur", "Narail")))
-    # Khagrachhar is in dist_01
-    # the other two are in dist_rest
-    # View(subset(dhs, ADM2_EN == "Khagrachhari"))
-    # table(subset(dhs, ADM2_EN == "Khagrachhari")$nt_ebf)
-    # table(subset(dhs, ADM2_EN == "Meherpur")$nt_ebf)
-    # table(subset(dhs, ADM2_EN == "Narail")$nt_ebf)
-    # View(subset(dhs, ADM2_EN == "Meherpur" & !is.na(nt_ebf)))
-    # View(subset(dhs, ADM2_EN == "Meherpur" & is.na(nt_ebf)))
-    
-    # When prevalence is 0 or 1 in a district
-    # If less than 10 total observations, recode reported values as NA (to avoid corrupting data)
-    # If more than 10 total observations, add a synthetic observations with opposite value
-    # (The synthetic household is added to the first cluster in the district)
-    for (j in seq_along(v_dist_01)) {
-      
-      df_tmp <- dist_01 %>%
-        filter(ADM2_EN == v_dist_01[j], !is.na(!!var_sym))
-      
-      if(nrow(df_tmp) < 10){
-        dist_01 <- dist_01 %>%
-          mutate(!!var_sym := case_when(  # using := to support tidy evaluation of left side of equation
-            ADM2_EN == v_dist_01[j] & !is.na(!!var_sym) ~ NA,
-            TRUE ~ !!var_sym
-          )) 
-      }
-      
-      if(nrow(df_tmp) >= 10){
-        df_synthetic <- df_tmp %>%
-          slice_sample(n = 1) %>%
-          mutate(!!var_sym := abs(!!var_sym - 1))
-        dist_01 <- bind_rows(dist_01, df_synthetic)
-      }
-    }
-    
-    # When all clusters in a given district have the same prevalence (no between cluster variance)
-    # (for all clusters, there are an equal number of households with 0's and 1's)
-    # (example, indicator exbf, Meherpur and Narail districts)
-    # Perturb each individual value slightly away from 0 or 1
-    for (j in seq_along(v_dist_0bwclustvar)) {
-      
-      noise <- runif(nrow(dist_0bwclustvar), -0.01, 0.01)
-      dist_0bwclustvar <- dist_0bwclustvar %>%
-        mutate(!!var_sym := if_else(ADM2_EN == v_dist_0bwclustvar[j] & !is.na(!!var_sym),
-                                  as.numeric(!!var_sym) + noise,
-                                  as.numeric(!!var_sym))
-        )
-      
-    }
-    
-    
-    # Combine
-    dhs_syn <- bind_rows(dist_rest, dist_01, dist_0bwclustvar)
-    
-    # Set survey design
-    dhs_svy <- dhs_syn %>% as_survey_design(ids = "v001", # psu
-                                        strata = "v023", # strata for sampling
-                                        weights = "wt",
-                                        nest = TRUE)
-    # Calculate mean and variance
-    dir <- dhs_svy %>%
-      group_by(ADM2_EN) %>%
-      summarise(!!var_sym := survey_mean({{var_sym}}, na.rm = TRUE, vartype = "var"))
-    
-    # If all values were NA in a district, recode as NA rather than 0
-    dir <- dir %>%
-      mutate(
-        !!var_sym := if_else(
-          (!!var_sym == 0) & (!!sym(paste0(quo_name(var_sym), "_var")) == 0),
-          NA_real_,
-          !!var_sym
-        ),
-        !!sym(paste0(quo_name(var_sym), "_var")) := if_else(
-          (!!var_sym == 0) & (!!sym(paste0(quo_name(var_sym), "_var")) == 0),
-          NA_real_,
-          !!sym(paste0(quo_name(var_sym), "_var"))
-        )
-      )
-    
-    v_var <- names(dir)[grepl("_var", names(dir))]
-    v_dir <- names(dir)[!grepl("_var", names(dir))]
-    dir_var <- dir[,c("ADM2_EN", v_var)]
-    names(dir_var) <- gsub("_var", "", names(dir_var))
-    dir <- dir[,v_dir]
-    dir <- dir %>%
-      pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
-    dir_var <- dir_var %>%
-      pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
-    
-    res <- dir %>%
-      left_join(dir_var, by = c("ADM2_EN", "variable"))
-    l_res[[i]] <- res
-  }
-}
-df_res_syn <- do.call(rbind, l_res)
-
-# For each indicator that does not require a synthetic household 
-l_res <- list()
-for (i in seq_along(v_rest)) {
-
-  # Grab the variable name as a symbol
-  var_sym <- sym(v_rest[i])
-  
-  dhs_svy <- dhs_syn %>% as_survey_design(ids = "v001", # psu
-                                          strata = "v023", # strata for sampling
-                                          weights = "wt",
-                                          nest = TRUE)
-  dir <- dhs_svy %>%
-    group_by(ADM2_EN) %>%
-    summarise(!!var_sym := survey_mean({{var_sym}}, na.rm = TRUE, vartype = "var"))
-  v_var <- names(dir)[grepl("_var", names(dir))]
-  v_dir <- names(dir)[!grepl("_var", names(dir))]
-  dir_var <- dir[,c("ADM2_EN", v_var)]
-  names(dir_var) <- gsub("_var", "", names(dir_var))
-  dir <- dir[,v_dir]
-  dir <- dir %>%
-    pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir")
-  dir_var <- dir_var %>%
-    pivot_longer(cols = -ADM2_EN, names_to = "variable", values_to = "dir_var")
-  
-  res <- dir %>%
-    left_join(dir_var, by = c("ADM2_EN", "variable"))
-  l_res[[i]] <- res
-  
-}
-df_res_rest <- do.call(rbind, l_res)
-
-# combine
-df_res <- rbind(df_res_rest, df_res_syn)
-df_res <- df_res[order(df_res$variable, df_res$ADM2_EN),]
-
-est_adm2 <- dhs_codes %>%
-  left_join(naive, by = c("variable")) %>%
-  left_join(naive_var, by = c("ADM2_EN", "variable")) %>%
-  left_join(df_res, by = c("ADM2_EN", "variable")) %>%
-  left_join(obs_n, by = c("ADM2_EN", "variable")) %>%
-  left_join(dhs_degf, by = c("ADM2_EN"))
-
 # Combine adm2 direct and phantom -----------------------------------------
-
-# merge adm2 direct and adm2 with phantom households
-est_adm2_combined <- est_adm2 %>%
-  left_join(est_adm2_phantom %>% 
-              select(variable, ADM2_EN, design_based_ph_mean, design_based_ph_var, degf_ph, n_obs_ph),
-            by = c("variable", "ADM2_EN"))
 
 # replace direct with phantom household when...
 # obs_un != 0 (direct should still be NA in such cases)
 # obs_un != n_obs_ph (a phantom household was added)
 # Note this results in some relatively large changes with obs_un was 1
 ## subset(est_adm2_combined, variable == "ch_diar_zinc" & obs_un == 1)
-est_adm2_combined <- est_adm2_combined %>%
+est_adm2_combined <- est_adm2_phantom %>%
   mutate(dir = case_when(
     obs_un != 0 & obs_un != n_obs_ph ~ design_based_ph_mean,
     TRUE ~ dir),
