@@ -11,7 +11,7 @@ library(ggplot2)
 #' Inputs
 source("./src/util.R")
 # Manually calculated indicators
-direct <- read.csv("./gen/calculate-direct/audit/direct-estimates-adm0.csv")
+direct <- read.csv("./gen/calculate-direct/output/direct-estimates-adm0.csv")
 # StatCompiler
 dat_filename <- list.files("./gen/calculate-direct/audit")
 dat_filename <- dat_filename[grepl("statcompiler", dat_filename, ignore.case = TRUE)]
@@ -32,13 +32,12 @@ datLong <- data %>%
 
 # check rh_pnc_wm_2days, rh_pnc_wm_bfcounsel
 
-
 p1 <- datLong %>%
   ggplot() +
   geom_bar(aes(x = series, y = value, fill = series), stat = "identity") +
   facet_wrap(~variable) +
   theme(text = element_text(size = 10))
-ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare6.pdf"), p1, height = 10, width = 8, units = "in") 
+ggsave(str_glue("./gen/calculate-direct/audit/statcompiler-compare-2years.pdf"), p1, height = 10, width = 8, units = "in") 
 
 
 

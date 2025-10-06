@@ -46,23 +46,30 @@ all_dat <- subset(all_dat, survey_id == "BD2022DHS")
 all_dat %>%
   group_by(dhs_indicator_code) %>%
   summarise(n = n()) %>% filter(n > 1)
+all_dat %>%
+  group_by(dhs_indicator_code) %>%
+  mutate(n = n()) %>% filter(n > 1) %>%
+  as.data.frame()
 # Drop
 all_dat_samp <- all_dat %>%
-  filter(!(dhs_indicator_code == "CH_DIAT_C_ORS" & ByVariableLabel != "Five years preceding the survey")) %>%
-  filter(!(dhs_indicator_code == "CH_DIAT_C_ZNC" & ByVariableLabel != "Five years preceding the survey")) %>%
-  filter(!(dhs_indicator_code == "RH_ANCN_W_N4P" & ByVariableLabel != "Three years preceding the survey")) %>% # my indicator is for 5 years
+  filter(!(dhs_indicator_code == "CH_DIAT_C_ORS" & ByVariableLabel == "Five years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "CH_DIAT_C_ZNC" & ByVariableLabel == "Five years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "RH_ANCC_W_IRN" & ByVariableLabel == "Three years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "RH_ANCN_W_N4P" & ByVariableLabel == "Three years preceding the survey")) %>%
   filter(!(dhs_indicator_code == "RH_ANCS_W_BLP" & (ByVariableLabel != "Three years preceding the survey" |
-             dhs_indicator_description != "Antenatal care content (of ANC): Blood pressure measured"))) %>%
+                       dhs_indicator_description != "Antenatal care content (of ANC): Blood pressure measured"))) %>%
   filter(!(dhs_indicator_code == "RH_ANCS_W_BLS" & (ByVariableLabel != "Three years preceding the survey" |
-            dhs_indicator_description != "Antenatal care content (of ANC): Blood sample taken"))) %>%
+                       dhs_indicator_description != "Antenatal care content (of ANC): Blood sample taken"))) %>%
   filter(!(dhs_indicator_code == "RH_ANCS_W_URN" & (ByVariableLabel != "Three years preceding the survey" |
-            dhs_indicator_description != "Antenatal care content (of ANC): Urine sample taken"))) %>% 
+                       dhs_indicator_description != "Antenatal care content (of ANC): Urine sample taken"))) %>% 
   filter(!(dhs_indicator_code == "RH_ANCS_W_WGT" & (ByVariableLabel != "Three years preceding the survey" |
-            dhs_indicator_description != "Antenatal care content (of ANC): Weight measured"))) %>% 
+                       dhs_indicator_description != "Antenatal care content (of ANC): Weight measured"))) %>% 
+  filter(!(dhs_indicator_code == "RH_ANCT_W_TL4" & ByVariableLabel != "Three years preceding the survey")) %>%
   filter(!(dhs_indicator_code == "RH_DELA_C_SKP" & ByVariableLabel != "Three years preceding the survey")) %>%
   filter(!(dhs_indicator_code == "RH_DELP_C_DHF" & ByVariableLabel != "Three years preceding the survey")) %>%
-  filter(!(dhs_indicator_code == "RH_ANCC_W_IRN" & ByVariableLabel == "Two years preceding the survey")) %>%
-  filter(!(dhs_indicator_code == "RH_ANCT_W_TL4" & ByVariableLabel == "Two years preceding the survey"))
+  filter(!(dhs_indicator_code == "RH_TTIJ_W_PRT" & ByVariableLabel != "Three years preceding the survey")) %>%
+  filter(!(dhs_indicator_code == "RH_TTIJ_W_TT2" & ByVariableLabel != "Three years preceding the survey"))
+
 all_dat_samp %>%
   group_by(dhs_indicator_code) %>%
   summarise(n = n()) %>% filter(n > 1)
