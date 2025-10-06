@@ -232,7 +232,7 @@ fn_gen_nt_ch_micro_iron <- function(x){
   x <- x %>%
        mutate(nt_ch_micro_iron =
                case_when(
-                 age_months < 6 | age_months > 59 | b5==0 ~ 99, 
+                 age_months < 6 | age_months > 23 | b5==0 ~ 99, 
                  h42!=1 ~ 0 ,
                  h42==1 ~ 1 )) %>%
        replace_with_na(replace = list(nt_ch_micro_iron = c(99))) 
@@ -257,8 +257,8 @@ fn_gen_nt_ch_micro_vas	<- function(x){
   x$mdyc <- as.integer((x$v008a - (difftime(x$Date, "1960-01-01", units = "days") + 21916)) /30.4375)
   
   x$nt_ch_micro_vas <- 0
-  x$nt_ch_micro_vas[(x$age_months >=6 & x$age_months <= 59) & (x$h34 ==1 | x$mdyc <= 6)] <- 1
-  x$nt_ch_micro_vas[!(x$age_months >=6 & x$age_months <= 59) | x$b5 == 0 ] <- NA
+  x$nt_ch_micro_vas[(x$age_months >=6 & x$age_months <= 23) & (x$h34 ==1 | x$mdyc <= 6)] <- 1
+  x$nt_ch_micro_vas[!(x$age_months >=6 & x$age_months <= 23) | x$b5 == 0 ] <- NA
   x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 0] <- 0
   x$nt_ch_micro_vas[!is.na(x$nt_ch_micro_vas) & x$nt_ch_micro_vas == 1] <- 1
   
@@ -395,6 +395,10 @@ fn_gen_nt_ch_micro_mp <- function(x){
 # Percentage of children born in the five (or three) years preceding the survey with diarrhea in the two weeks preceding the survey who received zinc supplements
 fn_gen_ch_diar_zinc <- function(x){
   
+  # adding age limitation
+  x$age <- (x$v008 - x$b3)/12
+  x$age_months <- x$v008 - x$b3
+  
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap10_CH/CH_DIAR.R
   # //Diarrhea symptoms # //Zinc
   x <- x %>%
@@ -404,8 +408,8 @@ fn_gen_ch_diar_zinc <- function(x){
                b5==1 ~ 0  )) %>%
     mutate(ch_diar_zinc =
              case_when(
-               ch_diar==1 & h15e==1 ~ 1 ,
-               ch_diar==1 ~ 0)) 
+               ch_diar==1 & h15e==1 & age_months < 24 ~ 1 ,
+               ch_diar==1 & age_months < 24 ~ 0)) 
   
   return(x)
   
@@ -414,6 +418,10 @@ fn_gen_ch_diar_zinc <- function(x){
 # //Given ORS for diarrhea
 # Percentage of children born in the five (or three) years preceding the survey with diarrhea in the two weeks preceding the survey who received oral rehydration solution (ORS), that is either fluid from an ORS packet or a pre-packaged ORS fluid
 fn_gen_ch_diar_ors <- function(x){
+  
+  # adding age limitation
+  x$age <- (x$v008 - x$b3)/12
+  x$age_months <- x$v008 - x$b3
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/fe6659a1d3af7e358d158bc814e38c96bf6f5161/Chap10_CH/CH_DIAR.R
   # //Diarrhea symptoms # //Zinc
@@ -424,8 +432,8 @@ fn_gen_ch_diar_ors <- function(x){
                b5==1 ~ 0  )) %>%
     mutate(ch_diar_ors =
              case_when(
-               ch_diar==1 & (h13==1 | h13==2 | h13b==1)  ~ 1 ,
-               ch_diar==1 ~ 0)) 
+               ch_diar==1 & (h13==1 | h13==2 | h13b==1) & age_months < 24 ~ 1 ,
+               ch_diar==1 & age_months < 24 ~ 0)) 
   
   return(x)
   
@@ -489,7 +497,7 @@ fn_gen_nt_ch_gwmt_any <- function(x){
     mutate(age_months = b19) %>%
     mutate(nt_ch_gwmt_any =
              case_when(
-               age_months >59 | b5==0 ~ 99, # ineligible if older than 59m or not alive
+               age_months >23 | b5==0 ~ 99, # ineligible if older than 23m or not alive
                s321c == 1 ~ 1,
                s321c != 1 ~ 0)) %>%
     replace_with_na(replace = list(nt_ch_gwmt_any = c(99))) 
