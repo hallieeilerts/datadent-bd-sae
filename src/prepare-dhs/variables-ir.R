@@ -49,6 +49,8 @@ dat_var <- fn_gen_rh_anc_1vs(dat_var)
 dat_var <- fn_gen_rh_anc_bldpres(dat_var)
 dat_var <- fn_gen_rh_anc_urine(dat_var)
 dat_var <- fn_gen_rh_anc_bldsamp(dat_var)
+dat_var <- fn_gen_rh_anc_toxinj(dat_var)
+dat_var <- fn_gen_rh_anc_neotet(dat_var)
 dat_var <- fn_gen_rh_anc_wgt(dat_var)
 dat_var <- fn_gen_rh_anc_iron(dat_var)
 dat_var <- fn_gen_rh_pnc_nb_2days(dat_var)
@@ -60,7 +62,9 @@ dat_var <- dat_var %>%
   dplyr::select(ADM2_EN, ADM1_EN, v001, v002, v003, v012, v023, v024, v025, v106, 
          nt_wm_micro_iron, nt_wm_micro_iron_any, 
          rh_anc_4vs, rh_anc_1vs, rh_anc_1tri, rh_anc_bldpres,
-         rh_anc_urine, rh_anc_bldsamp, rh_anc_wgt, rh_anc_iron, 
+         rh_anc_urine, rh_anc_bldsamp, 
+         rh_anc_toxinj, rh_anc_neotet,
+         rh_anc_wgt, rh_anc_iron, 
          rh_pnc_wm_2days, rh_pnc_nb_2days, rh_pnc_wm_bfcounsel,
          wt) %>%
   mutate(mother_edu = as.character(as_factor(v106)),
