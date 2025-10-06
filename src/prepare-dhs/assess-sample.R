@@ -14,6 +14,7 @@ library(kableExtra)
 source("./src/util.R")
 # household variables
 hr <- readRDS("./gen/prepare-dhs/temp/variables-hr.rds")
+kr <- readRDS("./gen/prepare-dhs/temp/variables-kr.rds")
 # Bangladesh district boundaries
 bangladesh_1 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm1_bbs_20201113")
 bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
@@ -154,3 +155,39 @@ p2 <- ggplot() +
   theme(text = element_text(size = 10))
 # Plot for datadent presentation May 13 2025 on wide slides
 ggsave(paste0("./gen/prepare-dhs/output/n-clusters.png"), p2, width = 5, height = 5)
+
+
+# plot number of observations for sparse indicator ------------------------
+
+# observations for kr variables
+dat <- kr %>%
+  group_by(ADM2_EN) %>%
+  summarise(nt_ch_micro_vas = sum(!is.na(nt_ch_micro_vas)),
+            nt_ch_micro_dwm = sum(!is.na(nt_ch_micro_dwm)),
+            nt_ebf = sum(!is.na(nt_ebf)),
+            nt_ch_micro_mp = sum(!is.na(nt_ch_micro_mp)),
+            ch_diar_zinc = sum(!is.na(ch_diar_zinc)),
+            ch_diar_ors = sum(!is.na(ch_diar_ors)),
+            nt_ch_micro_iron = sum(!is.na(nt_ch_micro_iron)))
+
+# Join spatial data
+plotdat <- bangladesh_2 %>% 
+  left_join(dat, by = "ADM2_EN")
+
+# plot for households
+p <- ggplot() +
+  geom_sf(data = plotdat, aes(fill = ch_diar_ors), color = "black") +
+  geom_sf_text(data = plotdat, aes(label = ch_diar_ors), size = 2) +
+  scale_fill_gradientn(
+    colors = rev(wes_palette("Zissou1", 100, type = "continuous")),
+    limits = c(0, max(plotdat$ch_diar_ors, na.rm = TRUE)),  # adjust as needed
+    na.value = "grey80", name = ""
+  ) +
+  labs(title = "Number of observations",
+       subtitle = "Children under 5y with diarrhea in the preceding 2 weeks\nwho received ORS") +
+  theme_void() +
+  theme(text = element_text(size = 10))
+# Plot for datadent presentation Sept 2025 on wide slides
+ggsave(paste0("./gen/prepare-dhs/output/n-obs-ch_diar_ors.png"), p, width = 5, height = 5)
+
+
