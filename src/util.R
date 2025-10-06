@@ -124,6 +124,104 @@ check_overlap <- function(xmin, xmax, ymin, ymax) {
   return(overlap)
 }
 
+
+# Phantom household -------------------------------------------------------
+
+
+## NEED TO MAKE SURE THESE CALCULATED APPROPRIATELY
+#degf_ph
+#n_obs_ph
+
+# function to add phantom household when calculating direct estimates and process data frame for analysis
+sae_df <- function(df, est_orig, geo_level, strata, 
+                   add_phantom = FALSE, geo_level_upper = NULL){
+ 
+  # requires library(survey)
+  
+  strata_formula <- as.formula(paste("~", paste(strata, collapse = " + ")))
+  
+  # df_aggregates should have naive, naive_var, design_based_mean, design_based_var, n_obs (number of clusters), degf (cluster minus 1)
+  df_aggregates <- est_orig %>% filter(variable %in% myvar)
+  
+  # calculate cluster level variance
+  df_cluster_level <- dhs %>% 
+    group_by(pick(unique(c(geo_level_upper, geo_level, strata, "v001")))) %>%
+    summarise(cluster_mean = mean(.data[[var_sym]], na.rm = TRUE),
+              cluster_count = sum(.data[[var_sym ]], na.rm = TRUE),
+              cluster_weight = sum(wt),
+              #n_hh = n(),
+              n_hh = sum(!is.na(.data[[var_sym]]))
+    ) %>% 
+    ungroup() %>%
+    mutate(ea = as.character(v001),
+           strata_name = paste(.data[[strata[1]]])
+    )
+  df_cluster_level_original <- df_cluster_level
+  
+  # identify adm2/strata combos with one unique cluster mean
+  df_geo_phantom <- df_cluster_level %>%  
+    group_by(pick(unique(c(geo_level_upper, geo_level, strata)))) %>%
+    summarise(n_values = n_distinct(cluster_mean)) %>%
+    filter(n_values == 1) %>%
+    select(all_of(unique(c(geo_level_upper,geo_level,strata)))) %>%
+    mutate(strata_name = paste(.data[[strata[1]]]))
+  
+  strata_list <- unique(df_geo_phantom[["strata_name"]])
+  j = 0
+  for(each_stratum in strata_list){
+    
+    #each_stratum <- "7"
+    geo_phantom_list <- df_geo_phantom[[geo_level]][df_geo_phantom[["strata_name"]]==each_stratum]
+    
+    df_tmp_to_add <- df_cluster_level %>%
+      filter(strata_name == each_stratum) %>%
+      group_by(pick(unique(c(geo_level_upper, strata, "strata_name")))) %>%
+      summarise(cluster_mean = weighted.mean(cluster_mean, cluster_weight, na.rm = TRUE),
+                cluster_weight = sum(cluster_weight, na.rm = TRUE)/sum(n_hh),
+                n_hh = 1)
+    
+    for (each_geo in geo_phantom_list){
+      
+      #each_geo <- "Bagerhat"
+      j = j + 1
+      df_cluster_level <- bind_rows(df_cluster_level,
+                                    (df_tmp_to_add %>%
+                                       mutate(!!geo_level := each_geo,
+                                              ea = paste0("phantom",as.character(j)))
+                                    )
+      )
+    }
+  }
+  
+  # cluster level survey design
+  df_cluster_level_svy <- svydesign(
+    ids = ~ea,
+    strata = strata_formula,  
+    weights = ~cluster_weight,
+    data = df_cluster_level,
+    nest = TRUE
+  )
+  
+  df_aggregates_tmp <- svyby(formula = ~cluster_mean, 
+                             by = as.formula(paste("~",geo_level)),
+                             design = df_cluster_level_svy,
+                             FUN = svymean,
+                             na.rm = TRUE,
+                             vartype = "var") %>%
+    rename(design_based_ph_mean = cluster_mean, 
+           design_based_ph_var = var) %>%
+    left_join(
+      df_cluster_level %>% 
+        group_by(pick(geo_level)) |>
+        summarise(degf_ph = n() - 1,    # number of clusters (including phantom cluster if added) minus 1
+                  n_obs_ph = sum(n_hh)) # number of households (does not correspond with n_obs, which is number of clusters)
+    )
+  df_aggregates <- df_aggregates %>% left_join(df_aggregates_tmp, by = geo_level)
+  
+  return((list(df_aggregates, df_cluster_level, df_cluster_level_original)))
+   
+}
+
 # KR variables ------------------------------------------------------------
 
 # //Children age 6-59 mos given iron supplements
@@ -514,7 +612,7 @@ fn_gen_rh_del_inst <- function(x){
   # I adjusted code for this. Didn't see exact code at the following link.
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_DEL.R
   x <- x %>%
-    mutate(period = 60) %>%
+    mutate(period = 24) %>%
     mutate(age = b19) %>% # age of child
     mutate(rh_del_pltype =
              case_when(
@@ -538,7 +636,7 @@ fn_gen_rh_del_pvskill <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_DEL.R
   x <- x %>%
-    mutate(period = 60) %>%
+    mutate(period = 24) %>%
     mutate(age = b19) %>% # age of child
     mutate(rh_del_pv =
              case_when(
@@ -580,6 +678,7 @@ fn_gen_nt_wm_micro_iron <- function(x){
   x$nt_wm_micro_iron[x$m46_1 >= 60 & x$m46_1 < 90] <- 2
   x$nt_wm_micro_iron[x$m46_1 >= 90 & x$m46_1 <= 300] <- 3
   x$nt_wm_micro_iron[x$m46_1 >= 998 | x$m45_1 >= 8] <- NA
+  x$nt_wm_micro_iron_any[x$b19_01 > 24] <- NA # only for pregnancies in past two years
   
   x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron < 3] <-  0  # <90 days
   x$nt_wm_micro_iron[!is.na(x$nt_wm_micro_iron) & x$nt_wm_micro_iron >= 3] <- 1 # 90+ days
@@ -589,7 +688,7 @@ fn_gen_nt_wm_micro_iron <- function(x){
   return(x)
 }
 
-# //Women took any iron supplements during last pregnancy
+# //Women took any iron supplements during last pregnancy (previous 2 years)
 fn_gen_nt_wm_micro_iron_any <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap11_NT/NT_WM_NUT.R
@@ -600,6 +699,7 @@ fn_gen_nt_wm_micro_iron_any <- function(x){
   x$nt_wm_micro_iron_any[x$m46_1 >= 60 & x$m46_1 < 90] <- 2
   x$nt_wm_micro_iron_any[x$m46_1 >= 90 & x$m46_1 <= 300] <- 3
   x$nt_wm_micro_iron_any[x$m46_1 >= 998 | x$m45_1 >= 8] <- NA
+  x$nt_wm_micro_iron_any[x$b19_01 > 24] <- NA # only for pregnancies in past two years
   
   x$nt_wm_micro_iron_any[!is.na(x$nt_wm_micro_iron_any) & x$nt_wm_micro_iron_any == 0] <-  0  # none
   x$nt_wm_micro_iron_any[!is.na(x$nt_wm_micro_iron_any) & x$nt_wm_micro_iron_any >= 1] <- 1 # any
@@ -614,7 +714,7 @@ fn_gen_rh_anc_4vs <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
-    mutate(period = 60) %>%
+    mutate(period = 24) %>%
     mutate(age = b19_01) %>%
     mutate(rh_anc_numvs =
              case_when(
@@ -638,7 +738,7 @@ fn_gen_rh_anc_1vs <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
-    mutate(period = 60) %>%
+    mutate(period = 24) %>%
     mutate(age = b19_01) %>% # age of child
     mutate(rh_anc_numvs =
              case_when(
@@ -663,6 +763,8 @@ fn_gen_rh_anc_1tri	<- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <-  x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>% # age of child
     mutate(rh_anc_moprg =
                   case_when(
                     m14_1 == 0 ~ 0 ,
@@ -670,8 +772,8 @@ fn_gen_rh_anc_1tri	<- function(x){
                     m13_1  %in% c(4,5)  ~ 2 ,
                     m13_1  %in% c(6,7)~ 3,
                     m13_1>=8 & m13_1<=90 ~ 4, 
-                    m13_1>90 & m13_1<100 ~ 9 ,
-                    age>=period ~ 99 )) %>%
+                    m13_1>90 & m13_1<100 ~ 9,
+                    age >= period ~ 99 )) %>%
     replace_with_na(replace = list(rh_anc_moprg = c(99))) %>%
     mutate(rh_anc_1tri = 
              case_when(
@@ -681,9 +783,6 @@ fn_gen_rh_anc_1tri	<- function(x){
   return(x)
 }
 
-
-
-
 #fn_gen_fp_cusm_w_mod <- function(x){}
 #fn_gen_fp_cusy_w_mod <- function(x){}
 
@@ -692,10 +791,14 @@ fn_gen_rh_anc_bldpres <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
     mutate(ancany =
              case_when(
                m14_1 %in% c(0,99)   ~ 0 ,
-               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1,
+               age >= period ~ 99)) %>%
+    replace_with_na(replace = list(ancany = c(99))) %>%
     mutate(rh_anc_bldpres =
              case_when(
                m42c_1 == 1 & ancany==1 ~ 1,
@@ -708,10 +811,14 @@ fn_gen_rh_anc_urine <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
     mutate(ancany =
              case_when(
                m14_1 %in% c(0,99)   ~ 0 ,
-               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1,
+               age >= period ~ 99)) %>%
+    replace_with_na(replace = list(ancany = c(99))) %>%
     mutate(rh_anc_urine =
              case_when(
                m42d_1 == 1 & ancany==1 ~ 1  ,
@@ -724,16 +831,79 @@ fn_gen_rh_anc_bldsamp <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
     mutate(ancany =
              case_when(
                m14_1 %in% c(0,99)   ~ 0 ,
-               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1,
+               age >= period ~ 99)) %>%
+    replace_with_na(replace = list(ancany = c(99))) %>%
     mutate(rh_anc_bldsamp =
              case_when(
                m42e_1 == 1 & ancany==1 ~ 1  ,
                ancany==1 ~ 0 ))
   return(x)
 }
+
+# //tetanus toxoid injections
+# Percentage of women (aged 15-49 years) with a birth in the last 2 years preceding the survey who received at least 2 tetanus shots during their pregnancy
+fn_gen_rh_anc_toxinj <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
+    mutate(rh_anc_toxinj =
+             case_when(
+               m1_1 >1 & m1_1 <8 ~ 1 ,
+               v208 ==0 | age>=period ~ 99,
+               TRUE ~ 0)) %>%
+    replace_with_na(replace = list(rh_anc_toxinj = c(99)))
+
+}
+
+# //neonatal tetanus
+# Percentage of mothers with a last live birth in the two (or three/five) years preceding the survey who received sufficient tetanus toxoid injections to provide protection at birth. Includes mothers with two injections during the pregnancy of her last birth, or two or more injections (the last within 3 years of the last live birth), or three or more injections (the last within 5 years of the last birth), or four or more injections (the last within 10 years of the last live birth), or five or more injections at any time prior to the last birth 
+fn_gen_rh_anc_neotet <- function(x){
+  
+  # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
+  x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
+    mutate(ageyr=as.integer(age/12)) %>%
+    mutate(tet2lastp=
+             case_when(
+               m1_1 > 1 & m1_1 < 8 ~ 1,
+               TRUE ~ 0))
+  
+    x[["totet0"]] <- 0
+    x[["totet0"]] <- ifelse(!is.na(x[["m1_1"]]) & x[["m1_1"]]>0 & x[["m1_1"]]<8, x[["m1_1"]], 0)
+    x[["totet"]] <- x[["totet0"]]
+    x[["totet"]] <- ifelse(!is.na(x[["m1a_1"]]) & x[["m1a_1"]]>0 & x[["m1a_1"]]<8, x[["m1a_1"]] + x[["totet0"]], x[["totet0"]])
+    
+    x <- x %>%    
+      mutate(lastinj=
+               case_when(
+                 m1_1>0 & m1_1 <8 ~ 0,
+                 m1d_1 <20 & (m1_1==0 | (m1_1>7 & m1_1<9996)) ~ (m1d_1 - ageyr),
+                 TRUE ~9999)) %>%
+      mutate(ttprotect = 
+               case_when(
+                 tet2lastp ==1 ~ 1,
+                 totet>=2 & lastinj<=2 ~ 1,
+                 totet>=3 &  lastinj<=4 ~ 1,
+                 totet>=4 &  lastinj<=9 ~ 1,
+                 totet>=5 ~ 1,
+                 TRUE ~ 0))
+    
+    x[["rh_anc_neotet"]] <- x[["ttprotect"]]
+    x[["rh_anc_neotet"]] <- ifelse(x[["bidx_01"]]!=1 | x[["age"]]>=x[["period"]], NA, x[["ttprotect"]])
+  
+    return(x)
+}
+
+
 
 # //Weighed during pregnancy
 # // Weighed during pregnancy
@@ -745,10 +915,14 @@ fn_gen_rh_anc_wgt <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
     mutate(ancany =
              case_when(
                m14_1 %in% c(0,99)   ~ 0 ,
-               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1,
+               age >= period ~ 99)) %>%
+    replace_with_na(replace = list(ancany = c(99))) %>%
     mutate(rh_anc_wgt =
              case_when(
                m42a_1 == 1 & ancany==1 ~ 1  ,
@@ -776,10 +950,14 @@ fn_gen_rh_anc_iron <- function(x){
   
   # https://github.com/DHSProgram/DHS-Indicators-R/blob/main/Chap09_RH/RH_ANC.R
   x <- x %>%
+    mutate(period = 24) %>%
+    mutate(age = b19_01) %>%
     mutate(ancany =
              case_when(
                m14_1 %in% c(0,99)   ~ 0 ,
-               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1)) %>%
+               m14_1>=1 & m14_1<=60 | m14_1==98 ~ 1,
+               age >= period ~ 99)) %>%
+    replace_with_na(replace = list(ancany = c(99))) %>%
     mutate(rh_anc_iron =
              case_when(
                m45_1 == 1 & ancany==1 ~ 1  ,
@@ -928,7 +1106,7 @@ fn_gen_rh_pnc_wm_bfcounsel <- function(x){
 }
 
 
-# Women with a birth in the past five years who received a vitamin A dose in the first two months after delivery
+# Women with a birth in the past two years who received a vitamin A dose in the first two months after delivery
 # BD2014
 # Couldn't find code on DHS github, came up with code on my own
 fn_gen_nt_wm_ppvita <- function(x){
@@ -937,8 +1115,8 @@ fn_gen_nt_wm_ppvita <- function(x){
     mutate(age = v008-b3_01) %>% # age of child
     mutate(nt_wm_ppvita =
              case_when(
-               m54_1 == 1 & age < 60 ~ 1,
-               m54_1 == 0 & age < 60 ~ 0,
+               m54_1 == 1 & age < 24 ~ 1,
+               m54_1 == 0 & age < 24 ~ 0,
                TRUE ~ NA
              ))
   
