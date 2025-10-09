@@ -49,6 +49,19 @@ dat_var <- dat_var %>%
          mother_ln = v003) %>%
   select(-c(v008, v024, b3))
 
+# check how many observations per mother for nt_ch_gwmt_any
+# dat_var %>%
+#   filter(!is.na(nt_ch_gwmt_any)) %>%
+#   group_by(v001, v002, mother_ln) %>%
+#   summarise(n = n()) %>%
+#   group_by(n) %>%
+#   summarise(n = n()) %>%
+#   ungroup() %>%
+#   mutate(per = n/sum(n))
+# obs    n     per
+# 1   1517  0.989 
+# 2     17  0.011
+
 # Save --------------------------------------------------------------------
 
 saveRDS(dat_var, file = "./gen/prepare-dhs/temp/variables-kr-2017.rds")
