@@ -6,6 +6,7 @@
 rm(list = ls())
 #' Libraries
 library(srvyr)
+library(readxl)
 #' Inputs
 source("./src/util.R")
 ir <- readRDS("./gen/prepare-dhs/temp/variables-ir.rds")

@@ -66,11 +66,12 @@ v_var <- unique(df_ind$variable)
 #v_var <- "ch_diar_ors"
 #v_var <- unique(subset(df_ind, covar_grp %in% c("ch_trtmnt"))$variable)
 #v_var <- subset(ind, dhs_dataset == "kr" & status == "include")$variable
+v_var <- subset(ind, `changed to last 2 years` == "Round2")$variable
 
 # empty dataframe for storing model info
 modinfo <- data.frame()
 
-# merge outcome variables with covariates
+# merge outcome variables with district level covariates
 dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 
 # for each indicator

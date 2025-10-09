@@ -1,5 +1,6 @@
 ################################################################################
 #' @description Fit model using summer
+#' Need to manually adjust to run covariate models (current setting) or the intercept model
 #' @return Model fit
 ################################################################################
 #' Clear environment
@@ -60,8 +61,8 @@ mat <- getAmat(bangladesh_2, bangladesh_2$ADM2_EN)
 # vector of outcomes
 v_var <- unique(df_ind$variable)
 
-v_intmod <- subset(old_modinfo, vers == 100)$outcome
-v_var <- unique(subset(old_modinfo, !(outcome %in% v_intmod))$outcome)
+#v_intmod <- subset(old_modinfo, vers == 100)$outcome
+#v_var <- unique(subset(old_modinfo, !(outcome %in% v_intmod))$outcome)
 
 # empty dataframe for storing model info
 modinfo <- data.frame()
@@ -107,7 +108,8 @@ for(i in 1:length(v_var)){
     
     v_cov_mod <- df_covar_grp[,j+1]
     v_cov_mod <- v_cov_mod[!is.na(v_cov_mod)]
-    # for fitting intercept model (also change j loop to only run once)
+    # for fitting intercept model, just set v_cov_mod to 1
+    # (also change j loop to only run once)
     #v_cov_mod <- 1
     print(v_cov_mod)
     

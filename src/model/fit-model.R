@@ -59,6 +59,7 @@ stanfile <- here(paste0("src/model/", model_file))
 v_var <- unique(est$variable)
 #v_var <- "ch_diar_ors"
 #v_var <- subset(ind, dhs_dataset == "kr" & status == "include")$variable
+v_var <- subset(ind, `changed to last 2 years` == "Round2")$variable
 
 # empty dataframe for storing model info
 modinfo <- data.frame()

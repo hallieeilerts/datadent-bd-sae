@@ -1,5 +1,6 @@
 ################################################################################
-#' @description Creates faceted maps for multiple models for same indicator
+#' @description Creates faceted map of prevalence and variance for an indicator
+#' loads from model files (can easily do for any model)
 #' @return One faceted map for prevalence, one for variance
 ################################################################################
 #' Clear environment
@@ -20,6 +21,8 @@ bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
 info <- read.csv("./gen/model/audit/model-info.csv")
+# minimum error model for adm1
+minerror_adm1_mod <- read.csv("./gen/validation/output/agg-minerror-adm1.csv")
 ################################################################################
 
 # subset to included indicators
@@ -30,7 +33,7 @@ v_var <- unique(df_ind$variable)
 v_varlong <- df_ind$description
 
 # indicators coming from kr
-# for which i plot direct estimates without synthetic household
+# for which i plot direct estimates without phantom household
 v_var_ch <- subset(df_ind, dhs_dataset == "kr")$variable
 
 
@@ -47,7 +50,8 @@ for(i in 1:length(v_var_sept2025)){
   
   myoutcome <- v_var_sept2025[i]
   myoutlab <- subset(df_ind, variable == myoutcome)$description
-  mymodel <- subset(df_ind, variable == myoutcome)$model
+  # selected model for indicator (one with minimum aggregated adm1 error)
+  mymodel <- subset(minerror_adm1_mod, variable == myoutcome)$model
   print(myoutcome)
   
   ## VARIANCE SMOOTHING MODEL
@@ -92,7 +96,8 @@ for(i in 1:length(v_var_sept2025)){
   }
   
   # reshape direct estimates and predictions long
-  # use dirplot for direct estimates for indicators coming from child recode (where the direct estimate should be the one for plotting)
+  # use dirplot for direct estimates for indicators coming from child recode 
+  # (dirplot is the direct estimate without the phantom household. this is the one we want to plot)
   # use dir for other dhs data files (where the direct estimate didn't need to be calculated separately for plotting)
   if(myoutcome %in% v_var_ch){
     postpred_value <- postpred %>%
@@ -170,12 +175,12 @@ for(i in 1:length(v_var_sept2025)){
     mutate(model = "OurModel") %>%
     select(ADM2_EN, name, model, value, lb, ub, se, var)
   
-  ## ADD ON MODINFO
+  ## Add on covariate info
   
   postpred_comb <- postpred_ourmod
   postpred_comb$variable <- myoutcome
   
-  # Load model info for our model
+  # Load vers, test, covariate info for outcome models
   myinfo <- subset(info, outcome == myoutcome)[,c("vers", "test", "cov")]
   myinfo$name <- paste(myinfo$vers, myinfo$test, sep = "-")
   

@@ -497,7 +497,7 @@ fn_gen_nt_ch_gwmt_any <- function(x){
     mutate(age_months = b19) %>%
     mutate(nt_ch_gwmt_any =
              case_when(
-               age_months >23 | b5==0 ~ 99, # ineligible if older than 23m or not alive
+               age_months > 23 | b5==0 ~ 99, # ineligible if older than 23m or not alive
                s321c == 1 ~ 1,
                s321c != 1 ~ 0)) %>%
     replace_with_na(replace = list(nt_ch_gwmt_any = c(99))) 
