@@ -19,7 +19,7 @@ error_adm0 <- read.csv("./gen/validation/output/agg-error-adm0.csv")
 # minimum error model for adm1
 minerror_adm1_mod <- read.csv("./gen/validation/output/agg-minerror-adm1.csv")
 # model info
-#modinfo <- read.csv("./gen/model/audit/model-info.csv")
+modinfo <- read.csv("./gen/model/audit/model-info.csv")
 # Bangladesh division boundaries
 bangladesh_1 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm1_bbs_20201113")
 ################################################################################
@@ -35,11 +35,10 @@ v_var <- unique(df_ind$variable)
 
 # adm1 --------------------------------------------------------------------
 
-# Plot RMSE for all models
+# Plot RMSE for each indicator by model
 p1 <- error_adm1 %>% 
   group_by(variable, model) %>%
-  mutate(n = n(),
-         sqerror = (error)^2) %>%
+  mutate(sqerror = (error)^2) %>%
   summarise(RMSE = mean(sqerror)) %>%
   group_by(variable) %>%
   mutate(minRMSE = min(RMSE)) %>%
@@ -55,9 +54,107 @@ p1 <- error_adm1 %>%
   guides(fill = "none")
 ggsave(paste0("./gen/validation/audit/adm1-error-allmodels.png"), p1, width = 8, height = 10, units = "in", dpi = 300)
 
-# limit to model with minimum error
+# Plot RMSE for all indicators combined
+error_adm1 %>% 
+  group_by(model) %>%
+  mutate(sqerror = (error)^2) %>%
+  summarise(RMSE = mean(sqerror)) %>%
+  mutate(minRMSE = min(RMSE)) %>%
+  mutate(minbar = ifelse(RMSE == minRMSE, "min", "other")) %>%
+  ggplot() +
+  geom_bar(aes(x=model, y = RMSE, fill = minbar), stat = "identity") +
+  labs(x = "model", title = "Error") +
+  theme_bw() +
+  theme(text = element_text(size = 10), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("red","grey38")) + 
+  coord_flip() +
+  guides(fill = "none")
+
+# Plot RMSE for indicator type
+error_adm1 %>% 
+  left_join(ind %>% select(variable, covar_grp)) %>%
+  group_by(covar_grp, model) %>%
+  mutate(sqerror = (error)^2) %>%
+  summarise(RMSE = mean(sqerror)) %>%
+  group_by(covar_grp) %>%
+  mutate(minRMSE = min(RMSE)) %>%
+  mutate(minbar = ifelse(RMSE == minRMSE, "min", "other")) %>%
+  ggplot() +
+  geom_bar(aes(x=model, y = RMSE, fill = minbar), stat = "identity") +
+  labs(x = "model", title = "Error") +
+  theme_bw() +
+  theme(text = element_text(size = 10), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("red","grey38")) + 
+  coord_flip() +
+  facet_wrap(~covar_grp, scales = "free_x") +
+  guides(fill = "none")
+
+# Plot normalized RMSE
+error_adm1 %>% 
+  group_by(variable) %>%
+  mutate(error_normalized = (error - min(error))/(max(error) - min(error)),
+         sqerror = (error_normalized)^2) %>%
+  group_by(variable, model) %>%
+  summarise(RMSE = mean(sqerror)) %>%
+  mutate(minRMSE = min(RMSE)) %>%
+  mutate(minbar = ifelse(RMSE == minRMSE, "min", "other")) %>%
+  ggplot() +
+  geom_bar(aes(x=model, y = RMSE, fill = minbar), stat = "identity") +
+  labs(x = "model", title = "Error") +
+  theme_bw() +
+  theme(text = element_text(size = 10), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("red","grey38")) + 
+  coord_flip() +
+  facet_wrap(~variable, scales = "free_x") +
+  guides(fill = "none")
+
+# Plot normalized RMSE for all indicators combined
+error_adm1 %>% 
+  group_by(variable) %>%
+  mutate(error_normalized = (error - min(error))/(max(error) - min(error)),
+         sqerror = (error_normalized)^2) %>%
+  group_by(model) %>%
+  summarise(RMSE = mean(sqerror)) %>%
+  mutate(minRMSE = min(RMSE)) %>%
+  mutate(minbar = ifelse(RMSE == minRMSE, "min", "other")) %>%
+  ggplot() +
+  geom_bar(aes(x=model, y = RMSE, fill = minbar), stat = "identity") +
+  labs(x = "model", title = "Error") +
+  theme_bw() +
+  theme(text = element_text(size = 10), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("red","grey38")) + 
+  coord_flip() +
+  guides(fill = "none")
+
+# Plot normalized RMSE for indicator type
+error_adm1 %>% 
+  group_by(variable) %>%
+  mutate(error_normalized = (error - min(error))/(max(error) - min(error)),
+         sqerror = (error_normalized)^2) %>%
+  left_join(ind %>% select(variable, covar_grp)) %>%
+  group_by(covar_grp, model) %>%
+  summarise(RMSE = mean(sqerror)) %>%
+  mutate(minRMSE = min(RMSE)) %>%
+  mutate(minbar = ifelse(RMSE == minRMSE, "min", "other")) %>%
+  ggplot() +
+  geom_bar(aes(x=model, y = RMSE, fill = minbar), stat = "identity") +
+  labs(x = "model", title = "Error") +
+  theme_bw() +
+  theme(text = element_text(size = 10), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = c("red","grey38")) + 
+  coord_flip() +
+  facet_wrap(~covar_grp, scales = "free_x") +
+  guides(fill = "none")
+
+
+# # limit to model with minimum error
+# minerror_adm1 <- error_adm1 %>% 
+#   inner_join(minerror_adm1_mod, by = c("variable", "model"))
+# limit to chosen model
 minerror_adm1 <- error_adm1 %>% 
-  inner_join(minerror_adm1_mod, by = c("variable", "model"))
+  inner_join(modinfo %>%
+               select(variable, model_covar_grp) %>%
+               rename(model = model_covar_grp), by = c("variable", "model"))
 
 # Plot overlap for model with minimum error
 plotdat <- bangladesh_1 %>% 
@@ -147,9 +244,14 @@ p1 <- error_adm0 %>%
   guides(fill = "none")
 ggsave(paste0("./gen/validation/audit/adm0-error-allmodels.png"), p1, width = 8, height = 10, units = "in", dpi = 300)
 
-# identify model with minimum adm1 error
+# # limit to model with minimum error
+# minerror_adm0 <- error_adm0 %>% 
+#   inner_join(minerror_adm1_mod, by = c("variable", "model"))
+# limit to chosen model
 minerror_adm0 <- error_adm0 %>% 
-  inner_join(minerror_adm1_mod, by = c("variable", "model"))
+  inner_join(modinfo %>%
+               select(variable, model_covar_grp) %>%
+               rename(model = model_covar_grp), by = c("variable", "model"))
 
 # overlap
 table(minerror_adm0$int_overlap)
