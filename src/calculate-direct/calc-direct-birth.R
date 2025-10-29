@@ -19,6 +19,10 @@ dhs_codes <- ind_info %>%
   filter(status == "include" & dhs_dataset == "br") %>%
   select(dhs_indicator_code, variable)
 
+# Set focus districts
+dhs <- dhs %>%
+  mutate(FocusDistrict = ifelse(ADM2_EN %in% c("Dhaka", "Khulna", "Rangpur", "Sylhet"), "FocusDistricts", "No"))
+
 # adm2 naive --------------------------------------------------------------------
 
 # CALCULATE NAIVE ESTIMATES AT THE ADM2 LEVEL
@@ -194,8 +198,65 @@ est_adm0 <- dhs_codes %>%
   left_join(obs_n, by = c("variable")) %>%
   crossing(dhs_degf)
 
+# Focus districts ---------------------------------------------------------
+
+# CALCULATE DESIGN-BASED (DIRECT) ESTIMATES FOR FOCUS DISTRICTS
+
+dhs_svy <- dhs %>% as_survey_design(ids = "v001", # psu
+                                    strata = "v023", # strata for sampling
+                                    weights = "wt",
+                                    nest = TRUE)
+
+dir <- dhs_svy %>%
+  group_by(FocusDistrict) %>% 
+  summarise(rh_del_inst = survey_mean(rh_del_inst, na.rm = TRUE, vartype = "var"),
+            rh_del_pvskill = survey_mean(rh_del_pvskill, na.rm = TRUE, vartype = "var")) 
+v_var <- names(dir)[grepl("_var", names(dir))]
+v_dir <- names(dir)[!grepl("_var", names(dir))]
+dir_var <- dir[,c("FocusDistrict", v_var)]
+names(dir_var) <- gsub("_var", "", names(dir_var))
+dir <- dir[,v_dir]
+dir <- dir %>%
+  pivot_longer(cols = -FocusDistrict, names_to = "variable", values_to = "dir")
+dir_var <- dir_var %>%
+  pivot_longer(cols = -FocusDistrict, names_to = "variable", values_to = "dir_var")
+
+
+# by indicator and adm1, tabulate the number of non-missing observations (weighted and unweighted)
+obs_n <- data.frame()
+for(i in 1:length(dhs_codes$variable)){
+  
+  myvar <- dhs_codes$variable[i]
+  
+  df_crosstab <- dhs %>%
+    group_by(FocusDistrict) %>%
+    mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
+           obs_wt = ifelse(!is.na(get(myvar)), wt, 0)) %>%
+    summarise(obs_un = sum(obs_ind),
+              obs_wn = sum(obs_wt)) %>%
+    mutate(variable = myvar)
+  
+  obs_n <- rbind(obs_n, df_crosstab)
+  
+}
+
+# by adm1, calculate degrees of freedom (clusters - 1)
+dhs_degf <- dhs %>%
+  group_by(FocusDistrict) %>%
+  summarise(degf = n_distinct(v001) - 1) # psu/clusters v001? households v002?
+
+est_fd <- dhs_codes %>%
+  left_join(dir, by = c("variable")) %>%
+  left_join(dir_var, by = c("FocusDistrict", "variable")) %>%
+  left_join(obs_n, by = c("FocusDistrict", "variable")) %>%
+  left_join(dhs_degf, by = c("FocusDistrict")) %>% 
+  filter(FocusDistrict == "FocusDistricts")
+
+
 # Save --------------------------------------------------------------------
 
 write.csv(est_adm2, file = "./gen/calculate-direct/temp/direct-birth.csv", row.names = FALSE)
 write.csv(est_adm1, file = "./gen/calculate-direct/temp/direct-birth-adm1.csv", row.names = FALSE)
 write.csv(est_adm0, file = "./gen/calculate-direct/temp/direct-birth-adm0.csv", row.names = FALSE)
+write.csv(est_fd, file = "./gen/calculate-direct/temp/direct-birth-focusdistricts.csv", row.names = FALSE)
+

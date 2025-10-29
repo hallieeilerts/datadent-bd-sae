@@ -26,6 +26,11 @@ direct_child_adm0 <- read.csv("./gen/calculate-direct/temp/direct-child-adm0.csv
 direct_mother_adm0 <- read.csv("./gen/calculate-direct/temp/direct-mother-adm0.csv")
 direct_household_adm0 <- read.csv("./gen/calculate-direct/temp/direct-household-adm0.csv")
 direct_birth_adm0 <- read.csv("./gen/calculate-direct/temp/direct-birth-adm0.csv")
+# focus districts
+direct_child_fd <- read.csv("./gen/calculate-direct/temp/direct-child-focusdistricts.csv")
+direct_mother_fd <- read.csv("./gen/calculate-direct/temp/direct-mother-focusdistricts.csv")
+direct_household_fd <- read.csv("./gen/calculate-direct/temp/direct-household-focusdistricts.csv")
+direct_birth_fd <- read.csv("./gen/calculate-direct/temp/direct-birth-focusdistricts.csv")
 ################################################################################
 
 # merge direct estimates for plotting
@@ -44,9 +49,11 @@ direct <- direct %>%
 
 direct_adm1 <- rbind(direct_child_adm1, direct_mother_adm1, direct_household_adm1, direct_birth_adm1)
 direct_adm0 <- rbind(direct_child_adm0, direct_mother_adm0, direct_household_adm0, direct_birth_adm0)
+direct_fd <- rbind(direct_child_fd, direct_mother_fd, direct_household_fd, direct_birth_fd)
 
 # Save --------------------------------------------------------------------
 
 write.csv(direct, file = "./gen/calculate-direct/output/direct-estimates.csv", row.names = FALSE)
 write.csv(direct_adm1, file = "./gen/calculate-direct/output/direct-estimates-adm1.csv", row.names = FALSE)
 write.csv(direct_adm0, file = "./gen/calculate-direct/output/direct-estimates-adm0.csv", row.names = FALSE)
+write.csv(direct_fd, file = "./gen/calculate-direct/output/direct-estimates-focusdistricts.csv", row.names = FALSE)
