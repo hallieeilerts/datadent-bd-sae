@@ -18,6 +18,7 @@ info <- read.csv("./gen/model/audit/model-info.csv")
 direct_adm2 <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 direct_adm1 <- read.csv("./gen/calculate-direct/output/direct-estimates-adm1.csv")
 direct_adm0 <- read.csv("./gen/calculate-direct/output/direct-estimates-adm0.csv")
+direct_fd   <- read.csv("./gen/calculate-direct/output/direct-estimates-focusdistricts.csv")
 ################################################################################
 
 # subset to included indicators
@@ -54,6 +55,10 @@ for(i in 1:length(v_var)){
     filter(variable == myoutcome) %>%
     mutate(ADM0_EN = "Bangladesh") %>%
     select(ADM0_EN, dir, dir_var, obs_un, obs_wn)
+  # subset focus districts
+  mywt_fd <- direct_fd %>%
+    filter(variable == myoutcome) %>%
+    select(FocusDistrict, dir, dir_var, obs_un, obs_wn)
   
   # Load info for all models for outcome
   myinfo <- subset(info, outcome == myoutcome)[,c("vers", "test", "cov")]
@@ -104,6 +109,12 @@ for(i in 1:length(v_var)){
       mutate(ADM0_EN = "Bangladesh") %>%
       group_by(ADM0_EN) %>%
       summarise(across(all_of(colnames(df_post)[grepl('X',colnames(df_post))]), ~ weighted.mean(., w = obs_wn)))
+    # Group by focus districts and aggregate weighted mean
+    df_p_focus <- df_post |> as.data.frame() |>
+      mutate(FocusDistrict = ifelse(ADM2_EN %in% c("Dhaka", "Khulna", "Rangpur", "Sylhet"), "FocusDistricts", "No")) %>%
+      group_by(FocusDistrict) %>%
+      summarise(across(all_of(colnames(df_post)[grepl('X',colnames(df_post))]), ~ weighted.mean(., w = obs_wn))) %>%
+      filter(FocusDistrict == "FocusDistricts")
     
     # compute mean and credible intervals across all posterior samples for adm1
     alpha = 0.05
@@ -117,6 +128,7 @@ for(i in 1:length(v_var)){
     df_p_adm1 <- df_p_adm1 |> select(-colnames(df_post)[grepl('X',colnames(df_post))])
     df_p_adm1$admin_level <- "adm1"
     df_p_adm1$ADM0_EN <- "Bangladesh"
+    df_p_adm1$FocusDistrict <- NA
     # merge on adm1 weights
     df_p_adm1 <- df_p_adm1 %>%
       left_join(mywt_adm1, by = "ADM1_EN")
@@ -131,17 +143,34 @@ for(i in 1:length(v_var)){
     df_p_adm0 <- df_p_adm0 |> select(-colnames(df_post)[grepl('X',colnames(df_post))])
     df_p_adm0$admin_level <- "adm0"
     df_p_adm0$ADM1_EN <- NA
+    df_p_adm0$FocusDistrict <- NA
     # merge on adm0 weights
     df_p_adm0 <- df_p_adm0 %>%
       left_join(mywt_adm0, by = "ADM0_EN")
     
+    # Focus districts
+    df_p_focus$post_mean <- df_p_focus[,2:(nrow(df_p)+1)] |> rowMeans()
+    df_p_focus$post_var <- apply(df_p_focus[, 2:(nrow(df_p))], 1, var)
+    df_quantile =  apply(df_p_focus[,2:nrow(df_p)], 1 , quantile , probs = c(alpha/2,1-alpha/2) , na.rm = TRUE ) |> t()
+    df_p_focus$qt_lb <- df_quantile[, 1]
+    df_p_focus$qt_ub <- df_quantile[, 2]
+    df_p_focus$length95 <- df_p_focus$qt_ub - df_p_focus$qt_lb
+    df_p_focus <- df_p_focus |> select(-colnames(df_post)[grepl('X',colnames(df_post))])
+    df_p_focus$admin_level <- "focus-districts"
+    df_p_focus$ADM0_EN <- "Bangladesh"
+    df_p_focus$ADM1_EN <- NA
+    # merge on focus district weights
+    df_p_focus <- df_p_focus %>%
+      left_join(mywt_fd, by = "FocusDistrict")
+    
+    
     # combine adm1 and adm0
-    df_agg <- rbind(df_p_adm0, df_p_adm1)
+    df_agg <- rbind(df_p_adm0, df_p_adm1, df_p_focus)
     df_agg <-  df_agg %>%
       mutate(variable = myoutcome) %>%
       mutate(model = mymodel) %>%
       left_join(myinfo, by = "model") %>%
-      select(variable, admin_level, ADM0_EN, ADM1_EN, 
+      select(variable, admin_level, ADM0_EN, ADM1_EN,
              dir, dir_var,
              post_mean, post_var, qt_lb, qt_ub, 
              obs_un, obs_wn, 
