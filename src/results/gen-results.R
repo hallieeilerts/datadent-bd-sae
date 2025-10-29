@@ -10,7 +10,7 @@ library(tidyr)
 #' Inputs
 source("./src/util.R")
 # indicator info
-ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
+indinfo <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
 # model info
 modinfo <- read.csv("./gen/model/audit/model-info.csv")
 # minimum error model for adm1
@@ -18,6 +18,7 @@ minerror_adm1_mod <- read.csv("./gen/validation/output/agg-minerror-adm1.csv")
 # aggregated predictions for adm1 and adm0
 agg_adm1 <- read.csv("./gen/validation/output/agg-error-adm1.csv")
 agg_adm0 <- read.csv("./gen/validation/output/agg-error-adm0.csv")
+agg_fd <- read.csv("./gen/validation/output/agg-error-fd.csv")
 ################################################################################
 
 # Note 2025-10-08: 
@@ -25,18 +26,17 @@ agg_adm0 <- read.csv("./gen/validation/output/agg-error-adm0.csv")
 # (iii) combo file that sometimes has 103 and sometimes 102 depending on the indicator group.
 # This is the one I use in plotting. 
 # to produce i or ii, manually set it in mymodel. otherwise set mymodel as NULL
-mymodel <- "103-1" # "102-1", "103-1", NULL
+mymodel <- NULL # "102-1", "103-1", NULL
 if(!is.null(mymodel)){
   mymodsave <- sub("-.*", "", mymodel)
 }else{
   mymodsave <- "ByCovarGrp"
 }
 
-
 # adm2 predictions --------------------------------------------------------
 
 # subset to included indicators
-df_ind <- subset(ind, status == "include")
+df_ind <- subset(indinfo, status == "include")
 
 # vector of indicators
 v_var <- unique(df_ind$variable)
@@ -52,11 +52,12 @@ for(i in 1:length(v_var)){
   myoutcome <- v_var[i]
   print(myoutcome)
   
-  # # selected model for indicator (one with minimum aggregated adm1 error)
+  ## selecte model for indicator (one with minimum aggregated adm1 error)
   # mymodel <- subset(minerror_adm1_mod, variable == myoutcome)$model
-  # select model by covariate group. these were manually set in collaboration with Maiga after checking RMSE with adm1 estimate.
+  ## select model by covariate group
+  # these were manually set in collaboration with Maiga after checking RMSE with adm1 estimate.
   if(is.null(mymodel)){
-    assignmod <- subset(ind, variable == myoutcome)$model_covar_grp
+    assignmod <- subset(indinfo, variable == myoutcome)$model_covar_grp
   }else{
     assignmod <- mymodel
   }
@@ -149,8 +150,10 @@ dat <- dat %>%
 
 # aggregated predictions for adm0 and adm1 --------------------------------
 
+# and focus districts
+
 # combine aggregated predictions
-dat_agg <- rbind(agg_adm0, agg_adm1)
+dat_agg <- rbind(agg_adm0, agg_adm1, agg_fd)
 
 # # limit to model with lowest rmse
 # dat_agg <- dat_agg %>%
@@ -209,11 +212,13 @@ dat_res <- dat_res %>%
 colSums(is.na(dat_res))
 # no missing
 # variable, description, admin_level, ADM0_EN, r, se, ll, ul, un, wn, n_cluster, model, cov
-# ADM1_EN: number of missing is number of indicators (currently 31)
-# ADM2_EN: number of missing is number of indicators * (1 nat est + 8 adm1 est). 31*9 = 279
-# dir: missing happens when un = 0 (currently 16)
-# dir_se: missing happens when un = 0 (currently 16)
-# un_adm1_avg, wn_adm1_avg: number of missing is number of indicators * (1 nat est + 8 adm1 est). 31*9 = 279
+# ADM1_EN: number of missing is number of indicators (currently 31 * (1 adm1 + 1 focus district)) = 62
+# ADM2_EN: number of missing is number of indicators * (1 nat est + 8 adm1 est + 1 focus district). 31*10 = 310
+# dir: missing happens when un = 0 (currently 26) (was 16)
+nrow(subset(dat_res, un == 0))
+# dir_se: missing happens when un is 0 or 1 (currently 49) (was 16)
+nrow(subset(dat_res, un %in% c(0,1)))
+# un_adm1_avg, wn_adm1_avg: number of missing is number of indicators * (1 nat est + 8 adm1 est + 1 focus district). 31*10 = 310
 
 # check that no missing values in main columns of interest
 # variable, ADM2_EN, r, se, ll, ul, un, wn, model, cov
@@ -232,7 +237,7 @@ df_cb <- data.frame(variable = names(dat_res),
 
 df_cb$definition[df_cb$variable == "variable"] <- "Indicator code"
 df_cb$definition[df_cb$variable == "description"] <- "Variable description"
-df_cb$definition[df_cb$variable == "admin_level"] <- "Administrative level of estimate (adm0, adm1, adm2)"
+df_cb$definition[df_cb$variable == "admin_level"] <- "Administrative level of estimate (adm0, adm1, adm2, focus-districts)"
 df_cb$definition[df_cb$variable == "ADM0_EN"] <- "Administrative level 0 value"
 df_cb$definition[df_cb$variable == "ADM1_EN"] <- "Administrative level 1 value"
 df_cb$definition[df_cb$variable == "ADM2_EN"] <- "Administrative level 2 value"
@@ -263,6 +268,7 @@ df_cb$notes[df_cb$variable == "wn_adm1_avg"] <- "This variable is only not-missi
 # Reshape adm2 wide -------------------------------------------------------
 
 # fill in un and wn that are zero with the adm1 average
+# this is so Maiga and Hana can use the weights to calculate things
 dat_res_adm2 <-  dat_res %>%
   filter(admin_level == "adm2") %>%
   mutate(un = ifelse(un == 0, un_adm1_avg, un),
@@ -278,7 +284,6 @@ datWide <- dat_res_adm2 %>%
     names_glue = "{variable}_{.value}",
     names_vary  = "slowest"   # groups by indicator: ind_r, ind_se, ind_ll, etc. 
   ) 
-
 
 # Codebook for wide file with variable def --------------------------------------------------
 
