@@ -127,11 +127,6 @@ check_overlap <- function(xmin, xmax, ymin, ymax) {
 
 # Phantom household -------------------------------------------------------
 
-
-## NEED TO MAKE SURE THESE CALCULATED APPROPRIATELY
-#degf_ph
-#n_obs_ph
-
 # function to add phantom household when calculating direct estimates and process data frame for analysis
 sae_df <- function(df, est_orig, geo_level, strata, 
                    add_phantom = FALSE, geo_level_upper = NULL){
@@ -149,7 +144,6 @@ sae_df <- function(df, est_orig, geo_level, strata,
     summarise(cluster_mean = mean(.data[[var_sym]], na.rm = TRUE),
               cluster_count = sum(.data[[var_sym ]], na.rm = TRUE),
               cluster_weight = sum(wt),
-              #n_hh = n(),
               n_hh = sum(!is.na(.data[[var_sym]]))
     ) %>% 
     ungroup() %>%
@@ -170,7 +164,6 @@ sae_df <- function(df, est_orig, geo_level, strata,
   j = 0
   for(each_stratum in strata_list){
     
-    #each_stratum <- "7"
     geo_phantom_list <- df_geo_phantom[[geo_level]][df_geo_phantom[["strata_name"]]==each_stratum]
     
     df_tmp_to_add <- df_cluster_level %>%
@@ -182,7 +175,6 @@ sae_df <- function(df, est_orig, geo_level, strata,
     
     for (each_geo in geo_phantom_list){
       
-      #each_geo <- "Bagerhat"
       j = j + 1
       df_cluster_level <- bind_rows(df_cluster_level,
                                     (df_tmp_to_add %>%
