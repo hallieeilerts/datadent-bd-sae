@@ -31,12 +31,10 @@ data{
     array[NS] int<lower=1,upper=N> adm2_index; //index
     array[NS] real<lower=0, upper =1> p_hat; // direct estimate of prevalence
     array[NS] real<lower=0> v_hat; // direct estimate of variance
-    //vector[NS] v_floor; //new //REMOVING v_vfloor
     array[NS] real<lower=0> d; // degree of freedom in each area, at admin2 level ; 
     array[NS] int<lower=0> k; //number of respondants in each area, at admin2 level 
     
     int<lower=1> D;
-    //matrix[NS, D] X; // covariates // Hallie: made this edit after new fixed effects models for districts with missing data weren't working (ch_diar_ors)
     matrix[N, D] X; // covariates
     
     
