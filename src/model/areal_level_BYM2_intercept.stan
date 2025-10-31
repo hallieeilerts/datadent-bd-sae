@@ -70,12 +70,12 @@ model{
     // mean model prior
     target += icar_normal_lpdf(u1|N, node1,node2); 
     target += normal_lpdf(u2|0,1);   
-    target += pcprec_lpdf(sigma_u|1, 0.01); // this is penalised complexity instead of target += normal_lpdf(sigma_u|0,1); // 
+    target += pcprec_lpdf(sigma_u|1, 0.01); // this is penalised complexity instead of target += normal_lpdf(sigma_u|0,1); // have also tested 5, 0.05
     target += beta_lpdf(rho| 0.5,0.5); 
     target += normal_lpdf(b0| 0, 5);
     // var model prior
     target += normal_lpdf(tau|0,1); //instead of target += normal_lpdf(log(v)|f, sigma_tau); 
-    target += pcprec_lpdf(sigma_tau|1, 0.01); //  this is penalised complexity instead of target += normal_lpdf(sigma_tau|0,1); 
+    target += pcprec_lpdf(sigma_tau|1, 0.01); //  this is penalised complexity instead of target += normal_lpdf(sigma_tau|0,1); // 5, 0.05
     target += normal_lpdf(gamma0|0,1);
     target += normal_lpdf(gamma1|1,0.5);
     target += normal_lpdf(gamma2|-1, 0.5);

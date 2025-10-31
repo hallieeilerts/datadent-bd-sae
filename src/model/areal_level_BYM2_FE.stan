@@ -39,7 +39,7 @@ data{
     array[NS] int<lower=1,upper=N> adm2_index; //index
     array[NS] real<lower=0, upper =1> p_hat; // direct estimate of prevalence
     array[NS] real<lower=0> v_hat; // direct estimate of variance
-    vector[NS] v_floor; //new
+    //vector[NS] v_floor; //new //REMOVING v_vfloor
     array[NS] real<lower=0> d; // degree of freedom in each area, at admin2 level ; 
     array[NS] int<lower=0> k; //number of respondants in each area, at admin2 level 
     
@@ -76,15 +76,15 @@ parameters{
 transformed parameters {
     vector[N] u = (sigma_u)*(sqrt(rho/scaling_factor) * (u1) + sqrt(1-rho) * (u2));
     vector[N] p = inv_logit(b0 + X*beta + u);
-    //vector[NS] v = exp(gamma0 + gamma1*log(p[adm2_index].*(1-p[adm2_index])) + gamma2*log(to_vector(k)) + square(sigma_tau)*tau);
-    //vector[NS] scaled_vhat= d_vhat./v;
+    vector[NS] v = exp(gamma0 + gamma1*log(p[adm2_index].*(1-p[adm2_index])) + gamma2*log(to_vector(k)) + square(sigma_tau)*tau);
+    vector[NS] scaled_vhat= d_vhat./v;
     
     // adding floor to variance
-    vector[NS] logv = gamma0 + gamma1 * log(p[adm2_index] .* (1 - p[adm2_index])) + gamma2 * log(to_vector(k)) + sigma_tau * tau;
-    vector[NS] v_unfloored = exp(logv);
-    vector[NS] v;
-    for (i in 1:NS) v[i] = fmax(v_unfloored[i], v_floor[i]);
-    vector[NS] scaled_vhat = to_vector(d) .* (to_vector(v_hat) + v_floor) ./ v;
+    //vector[NS] logv = gamma0 + gamma1 * log(p[adm2_index] .* (1 - p[adm2_index])) + gamma2 * log(to_vector(k)) + sigma_tau * tau;
+    //vector[NS] v_unfloored = exp(logv);
+    //vector[NS] v;
+    //for (i in 1:NS) v[i] = fmax(v_unfloored[i], v_floor[i]);
+    //vector[NS] scaled_vhat = to_vector(d) .* (to_vector(v_hat) + v_floor) ./ v;
     
 }
 model{
