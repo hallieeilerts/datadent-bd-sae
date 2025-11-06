@@ -77,11 +77,6 @@ for(i in 1:length(v_var)){
   ind_dat <- subset(dat, variable == myoutcome)
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
   
-  # REMOVING BUFFER
-  # bound direct estimate between zero and 1
-  #eps <- 1e-10  # small buffer away from 0 and 1
-  #ind_dat$dir <- pmin(1 - eps, pmax(eps, ind_dat$dir))
-  
   # join spatial data
   ind_dist <- bangladesh_2 %>% 
     left_join(ind_dat, by = c("ADM2_EN", "ADM1_EN")) %>%
@@ -89,11 +84,6 @@ for(i in 1:length(v_var)){
   
   ### removing all districts with only one cluster
   ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
-  
-  # # set variance floor
-  # # c * p*(1-p)/k  (c = 1 is conservative; try 1.5 or 2 if needed)
-  # ind_dist_complete <- ind_dist_complete %>%
-  #   mutate(v_floor = 1 * dir*(1-dir) / obs_un)
     
   # covariate group for outcome
   v_covar_grp <- subset(ind, variable == myoutcome)$covar_grp
@@ -102,8 +92,6 @@ for(i in 1:length(v_var)){
   
   # for each set of covariates
   for(j in 1:(ncol(df_covar_grp)-1)){
-    
-    #j <- 1
     
     # file name
     vers <- vers_start + j

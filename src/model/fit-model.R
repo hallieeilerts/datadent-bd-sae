@@ -57,9 +57,6 @@ bangladesh_2$district_id <- 1:nrow(bangladesh_2)
 stanfile <- here(paste0("src/model/", model_file))
 # vector of outcomes
 v_var <- unique(est$variable)
-#v_var <- "ch_diar_ors"
-#v_var <- subset(ind, dhs_dataset == "kr" & status == "include")$variable
-v_var <- subset(ind, `changed to last 2 years` == "Round2")$variable
 
 # empty dataframe for storing model info
 modinfo <- data.frame()
@@ -74,21 +71,14 @@ for(i in 1:length(v_var)){
   ind_dat <- subset(est, variable == myoutcome)
   ind_dat <- ind_dat[order(ind_dat$ADM2_EN),]
   
-  # bound direct estimate between zero and 1
-  #eps <- 1e-10  # small buffer away from 0 and 1
-  #ind_dat$dir <- pmin(1 - eps, pmax(eps, ind_dat$dir))
-  
   # join spatial data
   ind_dist <- bangladesh_2 %>% 
     left_join(ind_dat, by = c("ADM1_EN", "ADM2_EN")) %>%
     arrange(ADM2_EN)
     
   ### removing all districts with only one cluster
-  #ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
-  ind_dist_complete <- ind_dist |>
-    filter(!is.na(dir_var), degf != 0, dir_var > 1e-10) %>%
-    mutate(v_floor = 1 * dir*(1-dir) / obs_un)
-  
+  ind_dist_complete <- ind_dist |> filter(!is.na(dir_var),degf!=0,dir_var>1e-10) 
+
   # Compile model
   mod <- cmdstan_model(stanfile)
   data_list <- list(
