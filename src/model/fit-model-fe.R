@@ -51,7 +51,7 @@ make_plots <- FALSE
 # set parameters
 burnin <- 1000
 niter <- 1000
-nchains <- 2
+nchains <- 4
 
 # create adm2_index
 bangladesh_2 <- bangladesh_2[order(bangladesh_2$ADM2_EN),]
@@ -60,13 +60,6 @@ bangladesh_2$district_id <- 1:nrow(bangladesh_2)
 stanfile <- here(paste0("src/model/", model_file))
 # vector of outcomes
 v_var <- unique(df_ind$variable)
-#v_var <- "nt_ch_micro_vas" # works
-#v_var <- "ch_diar_ors" # works
-#v_var <- "ch_diar_zinc" # works 
-#v_var <- "ch_diar_ors"
-#v_var <- unique(subset(df_ind, covar_grp %in% c("ch_trtmnt"))$variable)
-#v_var <- subset(ind, dhs_dataset == "kr" & status == "include")$variable
-v_var <- subset(ind, `changed to last 2 years` == "Round2")$variable
 
 # empty dataframe for storing model info
 modinfo <- data.frame()
@@ -77,7 +70,6 @@ dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 # for each indicator
 for(i in 1:length(v_var)){
 
-  #i <- 1
   myoutcome <- v_var[i]
   print(myoutcome)
   
