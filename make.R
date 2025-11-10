@@ -40,7 +40,6 @@ source("./src/calculate-direct/calc-direct-household.R", local = new.env())
 source("./src/calculate-direct/combine-direct.R", local = new.env())
 source("./src/calculate-direct/download-statcompiler.R", local = new.env())
 source("./src/calculate-direct/compare-statcompiler.R", local = new.env())
-# !! rh_pnc_wm_2days/RH_PCMN_W_MOT doesn't match well with statcompiler
 
 # Modeling ----------------------------------------------------------------
 
