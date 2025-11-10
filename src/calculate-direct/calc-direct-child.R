@@ -155,7 +155,7 @@ l_res <- lapply(ll_res, function(x) x[[1]])
 est_adm2_phantom <- do.call(rbind, l_res)
 
 
-# Combine adm2 direct and phantom -----------------------------------------
+# Combine adm2 direct and phantom household -----------------------------------------
 
 # replace direct with phantom household when...
 # obs_un != 0 (direct should still be NA in such cases)
@@ -172,6 +172,15 @@ est_adm2_combined <- est_adm2_phantom %>%
   dir_replacedw_ph = ifelse(obs_un != 0 & obs_un != n_obs_ph, 1, 0)
   ) 
 
+# # count number of indicators that had phantom cluster added
+# est_adm2_combined %>%
+#   group_by(variable) %>%
+#   summarise(ph = max(dir_replacedw_ph)) %>%
+#   filter(ph == 1) %>%
+#   pull(variable) %>%
+#   unique() %>% length()
+# # 9
+  
 # adm1 --------------------------------------------------------------------
 
 # CALCULATE DESIGN-BASED (DIRECT) ESTIMATES AT ADM1 LEVEL FOR VALIDATION
@@ -269,12 +278,6 @@ for(i in 1:length(dhs_codes$variable)){
   
   myvar <- dhs_codes$variable[i]
   
-  # df_crosstab <- dhs %>%
-  #   filter(!is.na(get(myvar))) %>%
-  #   summarise(obs_un = n(),
-  #             obs_wn = sum(wt)) %>%
-  #   mutate(variable = myvar)
-  # should do same as above, but has consistent syntax with adm2 approach
   df_crosstab <- dhs %>%
     mutate(obs_ind = ifelse(!is.na(get(myvar)), 1, 0),
            obs_wt = ifelse(!is.na(get(myvar)), wt, 0)) %>%

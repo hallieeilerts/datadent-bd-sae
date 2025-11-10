@@ -20,18 +20,7 @@ source("./src/util.R")
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 # District-level covariates
 covar <- read.csv("./gen/prepare-dhs/output/covar-district.csv")
-# Bangladesh district boundaries
-#bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
-# Adjacency matrix
-#prep <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
-# model info from previous models if it exists
-audit_files <- dir("./gen/model/audit/")
-if(sum(grepl("model-info", audit_files)) > 0){
-  old_modinfo <- read.csv("./gen/model/audit/model-info.csv")
-}else{
-  old_modinfo <- data.frame()
-}
-# newly created list of indicators
+# list of indicators
 ind <- read_excel("./data/ind-info.xlsx", sheet = "indicators")
 ################################################################################
 
@@ -45,8 +34,8 @@ unique(df_ind$covar_grp)
 # anc ---------------------------------------------------------------------
 
 # Possible covar 
-# Excluding child_age, because doesn't make sense for these covariates
-# After running once, excluding wealth_index because colinear with mother_edu and residence (see notes below)
+# Excluding child_age, because doesn't make sense for ANC covariates
+# After running once, excluding wealth_index because collinear with mother_edu and residence (see notes below)
 v_covar <- c("mother_edu",  "mother_age", "residence", "hhd_under5", "hhd_head_age", "hhd_head_sex")
 # excluded: "wealth_index", "child_age"
 
@@ -355,50 +344,6 @@ vif_res %>%
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   facet_wrap(~variable)
-
-
-
-# # ebf ----------------------------------------------------------------
-# 
-# # Possible covar 
-# # Excluding child_age, because doesn't make sense for this mother-level covariate
-# v_covar <- c("mother_edu", "mother_age", "residence", "hhd_under5", "hhd_head_age", "hhd_head_sex", "wealth_index")
-# # excluded: "child_age"
-# 
-# # indicators in this group
-# v_ind <- subset(df_ind, covar_grp == "ebf")$variable
-# 
-# df_res_all <- fn_imp_compare(v_ind, v_covar)
-# 
-# # covariate importance for each indicator from full model to model with 1 covariate
-# df_res_all %>%
-#   ggplot() +
-#   geom_bar(aes(x=covar, y = IncMSE, fill = covar), stat = "identity") +
-#   geom_hline(aes(yintercept = 0), color = "red") +
-#   labs(title = "Covariate importance by indicator", y = "Importance") +
-#   theme_bw() +
-#   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#   facet_grid(variable ~ ncovar)
-# 
-# # ranked covariate importance by number of covariates in model, collapsed across indicators
-# # Can see the number of times a covariate was most important (rank 1) in model, by number of covariates in that model
-# df_res_all %>%
-#   arrange(variable, -ncovar, -IncMSE) %>%
-#   group_by(ncovar, variable) %>%
-#   mutate(rank = 1:n()) %>% 
-#   group_by(covar, ncovar, rank) %>% 
-#   summarise(nrank = n()) %>% 
-#   ggplot() +
-#   geom_bar(aes(x=rank, y = nrank, fill = covar), stat = "identity") +
-#   geom_hline(aes(yintercept = 0), color = "red") +
-#   labs(title = "Covariate importance rank by number of cov in model", y = "N", x = "Rank") +
-#   theme_bw() +
-#   facet_grid(covar ~ ncovar)
-# 
-# ## 1st time running with all covariates except child_age
-# # clear cut case with just one indicator
-# # Will go with...
-# # hhd_under5, hhd_head_age, residence
 
 # del_pnc ----------------------------------------------------------------
 

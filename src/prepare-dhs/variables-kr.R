@@ -53,7 +53,7 @@ dat_var <- fn_gen_nt_ch_micro_mp(dat_var)
 dat_var <- fn_gen_ch_diar_zinc(dat_var)
 dat_var <- fn_gen_ch_diar_ors(dat_var)
 dat_var <- fn_gen_nt_ch_micro_iron(dat_var)
-#dat_var <- fn_gen_nt_mdd(dat_var)           # not needed
+#dat_var <- fn_gen_nt_mdd(dat_var)         # not needed
 #dat_var <- fn_gen_ch_meas_either(dat_var) # missing
 #dat_var <- fn_gen_ch_rotav3_either(dat_var) # missing
 #dat_var <- fn_gen_ch_pent3_either(dat_var) # missing
@@ -71,6 +71,27 @@ dat_var <- dat_var %>%
   rename(child_ln = b16,
          mother_ln = v003) %>%
   select(-c(v008, v024, b3))
+
+
+dhs_svy <- dat_var %>% as_survey_design(ids = "v001", # psu
+#                                     strata = "v023", # strata for sampling
+#                                     weights = "wt",
+#                                     nest = TRUE)
+# dir <- dhs_svy %>%
+#   group_by(ADM2_EN) %>%
+#   summarise(nt_ch_micro_dwm = survey_mean(nt_ch_micro_dwm, na.rm = TRUE, vartype = "var"))
+# # 6-59
+# foo1 <- dir
+# # 6-23
+# foo2 <- dir
+# p <- foo1 %>%
+#   mutate(age = "6-59m") %>%
+#   bind_rows(foo2 %>% mutate(age = "6-23m")) %>%
+#   ggplot() +
+#   geom_bar(aes(x=ADM2_EN, y = nt_ch_micro_dwm, fill = age), position = "dodge", stat = "identity") +
+#   coord_flip() +
+#   theme(text = element_text(size = 8))
+# ggsave("./gen/prepare-dhs/audit/ch_deworming.png", p, dpi = 500, width = 6, height = 4)
 
 # Save --------------------------------------------------------------------
 

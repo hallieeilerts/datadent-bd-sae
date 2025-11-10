@@ -20,18 +20,7 @@ source("./src/util.R")
 est <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")
 # District-level covariates
 covar <- read.csv("./gen/prepare-dhs/output/covar-district.csv")
-# Bangladesh district boundaries
-#bangladesh_2 <- st_read("./data/bgd_adm_bbs_20201113_SHP", layer = "bgd_admbnda_adm2_bbs_20201113")
-# Adjacency matrix
-#prep <- readRDS("./gen/prepare-shp/output/adjacency_matrix.rds")
-# model info from previous models if it exists
-audit_files <- dir("./gen/model/audit/")
-if(sum(grepl("model-info", audit_files)) > 0){
-  old_modinfo <- read.csv("./gen/model/audit/model-info.csv")
-}else{
-  old_modinfo <- data.frame()
-}
-# newly created list of indicators
+# List of indicators
 ind <- read_excel("./data/ind-info.xlsx")
 ################################################################################
 
@@ -41,10 +30,11 @@ dat <- merge(est, covar, by = c("ADM2_EN", "variable"))
 # subset to included indicators
 df_ind <- subset(ind, status == "include")
 
-# Check covariate importance ----------------------------------------------
+# Covariate importance ----------------------------------------------------
 
 # Fit a single random forest model using all the covariates specified.
-# %IncMSE: Mean increase in prediction error (RMSE or MSE) when that variable’s values are randomly permuted across the dataset. This is done after the model is trained — the model is fixed, but the data are perturbed.
+# Perturb data after fitting model.
+# IncMSE: Mean increase in prediction error (RMSE or MSE) when that variable’s values are randomly permuted across the dataset. 
 
 df_res_imp <- data.frame()
 for(i in 1:nrow(df_ind)){
@@ -62,7 +52,7 @@ for(i in 1:nrow(df_ind)){
   # Test using step()
   #step(glm(dir ~ residence + hhd_under5 + hhd_head_sex + hhd_head_age + mother_age + mother_edu + wealth_index, data = df), direction = "both")
   
-  # Test using random forest with all covaraites
+  # Test using random forest with all covariates
   rf_model <- randomForest(dir ~ mother_edu + mother_age + residence + wealth_index + hhd_under5 + hhd_head_age + hhd_head_sex + child_age, data = df, importance = TRUE)
   # A larger decrease in accuracy (or increase in MSE) indicates higher importance for that variable
   df_importance <- as.data.frame(importance(rf_model, type = 1))
@@ -80,14 +70,6 @@ df_plot <- merge(df_res_imp, df_ind[,c("variable", "covar_grp")])
 df_plot <- df_plot[order(df_plot$covar_grp, df_plot$variable, df_plot$IncMSE),]
 df_plot <-  df_plot %>%
   mutate(covar_grp = case_when(
-    # covar_grp == "ch_diar" ~ "Child diarrhea treatment",
-    # covar_grp == "ch_micro" ~ "Child micronutrients",
-    # covar_grp == "ebf" ~ "Exclusive breastfeeding",
-    # covar_grp == "ph" ~ "Household",
-    # covar_grp == "anc" ~ "ANC",
-    # covar_grp == "del" ~ "Delivery",
-    # covar_grp == "pnc" ~ "PNC",
-    # covar_grp == "wm_micro" ~ "Women micronutrients",
     covar_grp == "anc" ~ "ANC",
     covar_grp == "ch_nut" ~ "Child micronutrients",
     covar_grp == "ch_trtmnt" ~ "Child vaccinations and treatment",
@@ -97,17 +79,13 @@ df_plot <-  df_plot %>%
     TRUE ~ NA
   )) %>%
   mutate(covar_grp = factor(covar_grp, 
-                            # levels = c("ANC", "PNC", "Delivery",
-                            #                        "Child micronutrients", "Women micronutrients",
-                            #                        "Household",
-                            #                        "Child diarrhea treatment", "Exclusive breastfeeding")
                             levels = c("ANC", "Delivery and PNC",
                                        "Child micronutrients", "Child vaccinations and treatment",
                                        "Women micronutrients",
                                        "Household")
                             ))
 
-# make labels for included covariates
+# labels for included covariates
 df_text <- df_plot %>%
   group_by(covar_grp) %>%
   distinct(variable) %>%
@@ -128,8 +106,6 @@ p1 <- df_plot %>%
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ggsave(paste0("./gen/model/explore-covar/importance_", format(Sys.Date(), "%Y%m%d"), ".png"), p1, width = 10, height = 7.5, units = "in", dpi = 300)
-
-
 
 # Variance inflation ------------------------------------------------------
 
@@ -192,7 +168,7 @@ panel.diag.wrap <- function(x, ...) {
 
   var_name <- deparse(substitute(x))  # Will be overwritten, workaround below
 }
-# Wrapping labels in column names
+# wrapping labels in column names
 wrapped_names <- sapply(colnames(df), function(name) {
   paste(strwrap(name, width = 10), collapse = "\n")
 })

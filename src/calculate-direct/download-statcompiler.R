@@ -5,6 +5,7 @@
 #' Clear environment
 rm(list = ls())
 #' Libraries
+library(stringr)
 #' Inputs
 source("./src/util.R")
 direct <- read.csv("./gen/calculate-direct/output/direct-estimates.csv")

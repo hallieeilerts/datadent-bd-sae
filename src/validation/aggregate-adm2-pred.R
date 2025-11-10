@@ -183,6 +183,11 @@ for(i in 1:length(v_var)){
 
 }
 
+# dat %>%
+#   filter(variable == "ph_wtr_improve" & admin_level == "adm1") %>%
+#   select(ADM1_EN, model, cov, dir ) %>%
+#   arrange(ADM1_EN, model)
+
 dat <- dat[order(dat$variable, dat$admin_level, dat$ADM0_EN, dat$ADM1_EN),]
 
 # make sure no estimates are outside of intervals

@@ -23,6 +23,12 @@ agg <- read.csv("./gen/validation/temp/pred-agg.csv")
 modinfo <- read.csv("./gen/model/audit/model-info.csv")
 ################################################################################
 
+# agg %>%
+#   filter(variable == "ph_wtr_improve" & admin_level == "adm1") %>%
+#   select(ADM1_EN, model, cov, dir, post_mean)
+# direct_adm1 %>%
+#   filter(variable == "ph_wtr_improve")
+
 # subset to included indicators
 df_ind <- subset(ind, status == "include")
 
@@ -66,6 +72,12 @@ error_adm1 <- error_adm1 %>%
          agg, var_agg, se_agg, lb_agg, ub_agg,
          int_overlap, length95, error,
          model, cov)
+
+
+# error_adm1 %>%
+#   filter(variable == "ph_wtr_improve" & admin_level == "adm1") %>%
+#   arrange(ADM1_EN, model) %>%
+#   select(ADM1_EN, model, cov, dir, agg, error)
 
 # adm0 --------------------------------------------------------------------
 
